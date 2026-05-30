@@ -1,0 +1,18 @@
+---
+description: Anti-default agent policy — follow AGENTS.md (UI, Desktop, all work)
+alwaysApply: true
+---
+
+# Agent policy
+
+Follow **[AGENTS.md](../../AGENTS.md)** for every task in this repository.
+
+Normative spec: `openspec/specs/agent-anti-default/spec.md`
+
+## Non-negotiable
+
+- No invented product UX when specs or tasks are silent (stub, disable, or escalate).
+- No auto-save, tree navigation, welcome flows, shortcuts, or themes unless explicitly specified.
+- UI/Desktop crates call `core::Session` only — no duplicated graph logic.
+
+When unsure about interaction design, read `AGENTS.md` before implementing.

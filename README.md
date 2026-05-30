@@ -2,6 +2,8 @@
 
 Block-based graph knowledge base with append-only version history.
 
+Coding agents: see [AGENTS.md](AGENTS.md) (Cursor and Claude Code are wired via `.cursor/rules/` and [CLAUDE.md](CLAUDE.md)).
+
 ## Quick start
 
 ```bash
