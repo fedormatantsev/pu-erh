@@ -78,8 +78,8 @@ pub fn merge_histories_from_paths(
 mod tests {
     use super::*;
     use graph::{
-        append_block_version, append_edge_version, create_root_block_version, Properties,
-        Snapshot, PARENT_EDGE_TYPE,
+        append_block_version, append_edge_version, create_root_block_version, EdgeType, Properties,
+        Snapshot,
     };
     use tempfile::tempdir;
     use uuid::Uuid;
@@ -107,7 +107,7 @@ mod tests {
             &mut history,
             child,
             root,
-            PARENT_EDGE_TYPE,
+            EdgeType::Parent,
             false,
             Properties::new(),
         );

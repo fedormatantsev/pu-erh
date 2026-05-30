@@ -41,8 +41,8 @@ fn parse_uuid(value: &str) -> Result<Uuid, CoreError> {
 mod tests {
     use super::*;
     use graph::{
-        append_block_version, append_edge_version, create_root_block_version, Properties,
-        Snapshot, VersionHistory, PARENT_EDGE_TYPE,
+        append_block_version, append_edge_version, create_root_block_version, EdgeType, Properties,
+        Snapshot, VersionHistory,
     };
 
     fn test_snapshot() -> (Snapshot, Uuid, Uuid) {
@@ -55,7 +55,7 @@ mod tests {
             &mut history,
             child,
             root,
-            PARENT_EDGE_TYPE,
+            EdgeType::Parent,
             false,
             Properties::new(),
         );

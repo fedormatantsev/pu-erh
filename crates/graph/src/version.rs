@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::digest::{hash_block_content, hash_edge_content, Digest};
-use crate::model::Properties;
+use crate::model::{EdgeType, Properties};
 use crate::snapshot::Snapshot;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -48,7 +48,7 @@ pub struct EdgeVersion {
     pub source: Uuid,
     pub target: Uuid,
     #[serde(rename = "type")]
-    pub edge_type: String,
+    pub edge_type: EdgeType,
     pub version: u64,
     #[serde(with = "crate::digest::serde_hex")]
     pub digest: Digest,
@@ -66,17 +66,16 @@ impl EdgeVersion {
     pub fn new(
         source: Uuid,
         target: Uuid,
-        edge_type: impl Into<String>,
+        edge_type: EdgeType,
         version: u64,
         previous_digest: Option<Digest>,
         tombstoned: bool,
         properties: Properties,
     ) -> Self {
-        let edge_type = edge_type.into();
         let digest = hash_edge_content(
             source,
             target,
-            &edge_type,
+            edge_type,
             version,
             tombstoned,
             &properties,
@@ -97,7 +96,7 @@ impl EdgeVersion {
         EdgeIdentity {
             source: self.source,
             target: self.target,
-            edge_type: self.edge_type.clone(),
+            edge_type: self.edge_type,
         }
     }
 }
@@ -106,7 +105,7 @@ impl EdgeVersion {
 pub struct EdgeIdentity {
     pub source: Uuid,
     pub target: Uuid,
-    pub edge_type: String,
+    pub edge_type: EdgeType,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -202,15 +201,14 @@ pub fn append_edge_version(
     history: &mut VersionHistory,
     source: Uuid,
     target: Uuid,
-    edge_type: impl Into<String>,
+    edge_type: EdgeType,
     tombstoned: bool,
     properties: Properties,
 ) -> EdgeVersion {
-    let edge_type = edge_type.into();
     let identity = EdgeIdentity {
         source,
         target,
-        edge_type: edge_type.clone(),
+        edge_type,
     };
     let version = history.next_edge_version(&identity);
     let previous_digest = history.winning_edge_digest(&identity);
@@ -262,7 +260,7 @@ pub fn merge_histories(left: &VersionHistory, right: &VersionHistory) -> Version
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::PARENT_EDGE_TYPE;
+    use crate::model::EdgeType;
 
     #[test]
     fn next_version_increments() {
@@ -295,7 +293,7 @@ mod tests {
             &mut history,
             source,
             target,
-            PARENT_EDGE_TYPE,
+            EdgeType::Parent,
             false,
             Properties::new(),
         );
@@ -303,7 +301,7 @@ mod tests {
             &mut history,
             source,
             target,
-            PARENT_EDGE_TYPE,
+            EdgeType::Parent,
             true,
             Properties::new(),
         );

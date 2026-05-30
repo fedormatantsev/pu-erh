@@ -2,11 +2,11 @@ use std::collections::HashSet;
 
 use uuid::Uuid;
 
-use crate::model::{Block, Edge, GraphError, PARENT_EDGE_TYPE};
+use crate::model::{Block, Edge, EdgeType, GraphError};
 use crate::radix_trie::{DiffKind, RadixTrieMap, TrieDiffEntry};
 use crate::trie_key::{
     block_entity_prefix, block_version_key_from, edge_entity_prefix, edge_nav_prefix,
-    edge_version_key_from, EdgeType, BLOCK_ENTITY_PREFIX_LEN, EDGE_ENTITY_PREFIX_LEN,
+    edge_version_key_from, BLOCK_ENTITY_PREFIX_LEN, EDGE_ENTITY_PREFIX_LEN,
 };
 use crate::version::{BlockVersion, EdgeVersion, VersionHistory};
 
@@ -72,9 +72,8 @@ impl Snapshot {
         }
 
         for version in &history.edge_versions {
-            if let Some(key) = edge_version_key_from(version) {
-                edge_versions = edge_versions.insert(&key, version.clone());
-            }
+            let key = edge_version_key_from(version);
+            edge_versions = edge_versions.insert(&key, version.clone());
         }
 
         Self {
@@ -173,8 +172,7 @@ impl Snapshot {
         self.block(id)
     }
 
-    pub fn get_edge(&self, source: Uuid, target: Uuid, edge_type: &str) -> Option<Edge> {
-        let edge_type = EdgeType::try_from(edge_type).ok()?;
+    pub fn get_edge(&self, source: Uuid, target: Uuid, edge_type: EdgeType) -> Option<Edge> {
         self.active_edge(target, edge_type, source)
     }
 
@@ -341,7 +339,7 @@ fn decode_edge_diff(
     right: &Snapshot,
 ) -> SnapshotDiffEntry {
     let target = Uuid::from_bytes(entry.key[..16].try_into().expect("target"));
-    let edge_type = EdgeType::Parent;
+    let edge_type = edge_type_from_entity_byte(entry.key[16]).unwrap_or(EdgeType::Parent);
     let source = Uuid::from_bytes(entry.key[17..33].try_into().expect("source"));
     SnapshotDiffEntry {
         entity: SnapshotDiffEntity::Edge {
@@ -351,10 +349,10 @@ fn decode_edge_diff(
         },
         kind: entry.kind,
         old: left
-            .get_edge(source, target, PARENT_EDGE_TYPE)
+            .get_edge(source, target, edge_type)
             .map(BlockOrEdge::Edge),
         new: right
-            .get_edge(source, target, PARENT_EDGE_TYPE)
+            .get_edge(source, target, edge_type)
             .map(BlockOrEdge::Edge),
     }
 }
@@ -371,7 +369,7 @@ fn edge_from_version(version: &EdgeVersion) -> Edge {
     Edge {
         source: version.source,
         target: version.target,
-        edge_type: version.edge_type.clone(),
+        edge_type: version.edge_type,
         properties: version.properties.clone(),
     }
 }
@@ -379,7 +377,7 @@ fn edge_from_version(version: &EdgeVersion) -> Edge {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::Properties;
+    use crate::model::{EdgeType, Properties};
     use crate::version::{append_block_version, append_edge_version, create_root_block_version};
 
     #[test]
@@ -458,7 +456,7 @@ mod tests {
             &mut left,
             child,
             root,
-            PARENT_EDGE_TYPE,
+            EdgeType::Parent,
             false,
             Properties::new(),
         );
@@ -470,7 +468,7 @@ mod tests {
             &mut right,
             child,
             root,
-            PARENT_EDGE_TYPE,
+            EdgeType::Parent,
             false,
             Properties::new(),
         );

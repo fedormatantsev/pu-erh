@@ -21,7 +21,7 @@ Each block mutation MUST append a block version record containing `id`, `version
 
 ### Requirement: Edge version record
 
-Each edge mutation MUST append an edge version record containing `source`, `target`, `edge_type`, `version`, `digest`, `previous_digest`, and `properties`. Edge identity is the triple `(source, target, edge_type)`.
+Each edge mutation MUST append an edge version record containing `source`, `target`, `edge_type` (a `#[repr(u8)]` enum), `version`, `digest`, `previous_digest`, and `properties`. Edge identity is the triple `(source, target, edge_type)`.
 
 #### Scenario: Edge version chain
 

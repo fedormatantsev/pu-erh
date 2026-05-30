@@ -1,6 +1,6 @@
 use graph::{
-    append_block_version, append_edge_version, GraphError, Properties, Snapshot,
-    VersionHistory, PARENT_EDGE_TYPE,
+    append_block_version, append_edge_version, EdgeType, GraphError, Properties, Snapshot,
+    VersionHistory,
 };
 use uuid::Uuid;
 
@@ -26,7 +26,7 @@ pub fn create_block(
         history,
         id,
         parent,
-        PARENT_EDGE_TYPE,
+        EdgeType::Parent,
         false,
         Properties::new(),
     );
@@ -59,7 +59,7 @@ pub fn move_block(
             history,
             id,
             old_parent,
-            PARENT_EDGE_TYPE,
+            EdgeType::Parent,
             true,
             Properties::new(),
         );
@@ -69,7 +69,7 @@ pub fn move_block(
         history,
         id,
         new_parent,
-        PARENT_EDGE_TYPE,
+        EdgeType::Parent,
         false,
         Properties::new(),
     );
@@ -96,7 +96,7 @@ pub fn delete_block(
             history,
             id,
             parent,
-            PARENT_EDGE_TYPE,
+            EdgeType::Parent,
             true,
             Properties::new(),
         );

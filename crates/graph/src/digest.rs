@@ -4,6 +4,7 @@ use blake3::Hasher;
 use serde::{Deserialize, Deserializer, Serializer};
 use uuid::Uuid;
 
+use crate::model::EdgeType;
 use crate::Properties;
 
 pub type Digest = [u8; 32];
@@ -25,7 +26,7 @@ pub fn hash_block_content(
 pub fn hash_edge_content(
     source: Uuid,
     target: Uuid,
-    edge_type: &str,
+    edge_type: EdgeType,
     version: u64,
     tombstoned: bool,
     properties: &Properties,
@@ -33,7 +34,7 @@ pub fn hash_edge_content(
     let mut hasher = Hasher::new();
     hasher.update(source.as_bytes());
     hasher.update(target.as_bytes());
-    hasher.update(edge_type.as_bytes());
+    hasher.update(&[edge_type as u8]);
     hasher.update(&version.to_le_bytes());
     hasher.update(&[u8::from(tombstoned)]);
     hash_properties(&mut hasher, properties);

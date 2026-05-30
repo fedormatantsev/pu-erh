@@ -1,12 +1,60 @@
 use std::collections::HashMap;
+use std::convert::TryFrom;
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
 use uuid::Uuid;
 
-pub const PARENT_EDGE_TYPE: &str = "parent";
-
 pub type Properties = HashMap<String, serde_json::Value>;
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum EdgeType {
+    Parent = 0,
+}
+
+impl EdgeType {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Parent => "parent",
+        }
+    }
+}
+
+impl TryFrom<u8> for EdgeType {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Parent),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<&str> for EdgeType {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "parent" => Ok(Self::Parent),
+            _ => Err(()),
+        }
+    }
+}
+
+impl Serialize for EdgeType {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_u8(*self as u8)
+    }
+}
+
+impl<'de> Deserialize<'de> for EdgeType {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let byte = u8::deserialize(deserializer)?;
+        Self::try_from(byte).map_err(|_| serde::de::Error::custom("invalid edge type"))
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Block {
@@ -19,7 +67,7 @@ pub struct Edge {
     pub source: Uuid,
     pub target: Uuid,
     #[serde(rename = "type")]
-    pub edge_type: String,
+    pub edge_type: EdgeType,
     pub properties: Properties,
 }
 
@@ -27,16 +75,16 @@ pub struct Edge {
 pub struct EdgeKey(String);
 
 impl EdgeKey {
-    pub fn new(target: Uuid, edge_type: &str, source: Uuid) -> Self {
-        Self(format!("{target}{edge_type}{source}"))
+    pub fn new(target: Uuid, edge_type: EdgeType, source: Uuid) -> Self {
+        Self(format!("{target}{}{source}", edge_type as u8))
     }
 
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
-    pub fn prefix_for(target: Uuid, edge_type: &str) -> String {
-        format!("{target}{edge_type}")
+    pub fn prefix_for(target: Uuid, edge_type: EdgeType) -> String {
+        format!("{target}{}", edge_type as u8)
     }
 }
 

@@ -29,12 +29,17 @@ Each block MUST contain an id and a properties map (generic key/value dictionary
 
 ### Requirement: Edge structure
 
-Each edge MUST have a source id, a target id, an edge type string, and a properties map (generic key/value dictionary).
+Each edge MUST have a source id, a target id, an edge type represented as a `#[repr(u8)]` enum, and a properties map (generic key/value dictionary).
 
 #### Scenario: Edge fields are accessible
 
 - **WHEN** an edge exists in the graph
 - **THEN** its source, target, edge type, and properties are readable
+
+#### Scenario: Edge type is u8-backed
+
+- **WHEN** an edge exists in the graph
+- **THEN** its edge type is one of the defined `EdgeType` variants serialized as a u8
 
 #### Scenario: New edge has empty properties by default
 
@@ -55,9 +60,18 @@ Active edges in the materialized snapshot MUST be indexed by composite key `{tar
 - **WHEN** an edge identity has a winning tombstoned version
 - **THEN** that edge is absent from the active view
 
+### Requirement: Edge type enum
+
+Edge types MUST be represented by a `#[repr(u8)]` enum. The v0 enum MUST define `Parent = 0`.
+
+#### Scenario: Parent edge type value
+
+- **WHEN** a parent edge exists
+- **THEN** its edge type equals `EdgeType::Parent` (u8 value 0)
+
 ### Requirement: Parent edges
 
-Hierarchy MUST be represented by edges with type `"parent"`, where the source is the child block and the target is the parent block.
+Hierarchy MUST be represented by edges with type `EdgeType::Parent`, where the source is the child block and the target is the parent block.
 
 #### Scenario: Child linked to parent
 

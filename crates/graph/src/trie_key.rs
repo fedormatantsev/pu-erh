@@ -1,9 +1,7 @@
-use std::convert::TryFrom;
-
 use uuid::Uuid;
 
 use crate::digest::Digest;
-use crate::model::PARENT_EDGE_TYPE;
+use crate::model::EdgeType;
 
 pub const CRDT_SUFFIX_LEN: usize = 72;
 pub const BLOCK_ENTITY_PREFIX_LEN: usize = 16;
@@ -13,31 +11,6 @@ pub const EDGE_NAV_PREFIX_LEN: usize = 17;
 pub const EDGE_KEY_LEN: usize = 105;
 
 const ZERO_DIGEST: Digest = [0u8; 32];
-
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum EdgeType {
-    Parent = 0,
-}
-
-impl EdgeType {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Parent => PARENT_EDGE_TYPE,
-        }
-    }
-}
-
-impl TryFrom<&str> for EdgeType {
-    type Error = ();
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
-            PARENT_EDGE_TYPE => Ok(Self::Parent),
-            _ => Err(()),
-        }
-    }
-}
 
 pub struct CrdtKeySuffix;
 
@@ -141,16 +114,15 @@ pub fn block_version_key_from(version: &crate::version::BlockVersion) -> [u8; BL
     )
 }
 
-pub fn edge_version_key_from(version: &crate::version::EdgeVersion) -> Option<[u8; EDGE_KEY_LEN]> {
-    let edge_type = EdgeType::try_from(version.edge_type.as_str()).ok()?;
-    Some(edge_version_key(
+pub fn edge_version_key_from(version: &crate::version::EdgeVersion) -> [u8; EDGE_KEY_LEN] {
+    edge_version_key(
         version.target,
-        edge_type,
+        version.edge_type,
         version.source,
         version.version,
         &version.digest,
         version.previous_digest.as_ref(),
-    ))
+    )
 }
 
 #[cfg(test)]

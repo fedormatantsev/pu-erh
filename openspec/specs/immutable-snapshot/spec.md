@@ -87,7 +87,7 @@ The snapshot MUST support retrieving active edges whose entity identity prefixes
 - **WHEN** parent edge version records exist with target set to a given parent block id
 - **AND** query uses the 17-byte prefix of target UUID bytes followed by the `Parent` edge type byte
 - **THEN** the winning non-tombstoned parent edge per distinct source child is returned
-- **AND** each returned edge has edge type `parent` and target equal to the parent block id
+- **AND** each returned edge has edge type `EdgeType::Parent` and target equal to the parent block id
 
 ### Requirement: Snapshot structural diff
 
