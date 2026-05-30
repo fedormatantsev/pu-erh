@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-block"
+description = "Enables the block command"
+commands.allow = ["block"]

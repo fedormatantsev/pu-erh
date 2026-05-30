@@ -37,8 +37,13 @@ impl AppState {
     }
 
     pub fn open_at(path: PathBuf) -> Result<Self, CoreError> {
+        let is_new = !path.exists();
+        let mut session = Session::open(path)?;
+        if is_new {
+            session.save()?;
+        }
         Ok(Self {
-            session: Mutex::new(Session::open(path)?),
+            session: Mutex::new(session),
         })
     }
 
@@ -108,20 +113,36 @@ mod tests {
     }
 
     #[test]
-    fn open_at_missing_file_creates_empty_session() {
+    fn open_at_missing_file_bootstraps_root() {
         let dir = tempdir().expect("tempdir");
         let path = dir.path().join("pu-erh/kb.json");
-        let state = AppState::open_at(path.clone()).expect("open");
-        assert!(state.root_id().is_err());
+        let state = AppState::open_at(path).expect("open");
+        assert!(state.root_id().is_ok(), "root_id must succeed after bootstrap");
     }
 
     fn state_with_root() -> (AppState, String, tempfile::TempDir) {
         let dir = tempdir().expect("tempdir");
         let path = dir.path().join("pu-erh/kb.json");
         let state = AppState::open_at(path).expect("open");
-        state.save().expect("save creates root");
         let root = state.root_id().expect("root id");
         (state, root, dir)
+    }
+
+    #[test]
+    fn open_at_existing_file_does_not_overwrite() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join("pu-erh/kb.json");
+        AppState::open_at(path.clone()).expect("first open bootstraps");
+        let mtime_before = std::fs::metadata(&path)
+            .expect("file exists")
+            .modified()
+            .expect("mtime");
+        AppState::open_at(path.clone()).expect("second open");
+        let mtime_after = std::fs::metadata(&path)
+            .expect("file still exists")
+            .modified()
+            .expect("mtime");
+        assert_eq!(mtime_before, mtime_after, "re-opening existing KB must not modify the file");
     }
 
     #[test]

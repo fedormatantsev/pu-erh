@@ -177,6 +177,18 @@
       "description": "Permission identifier",
       "oneOf": [
         {
+          "description": "Enables the block command",
+          "type": "string",
+          "const": "allow-block",
+          "markdownDescription": "Enables the block command"
+        },
+        {
+          "description": "Enables the children command",
+          "type": "string",
+          "const": "allow-children",
+          "markdownDescription": "Enables the children command"
+        },
+        {
           "description": "Enables the ping command",
           "type": "string",
           "const": "allow-ping",
@@ -187,6 +199,18 @@
           "type": "string",
           "const": "allow-root-id",
           "markdownDescription": "Enables the root_id command"
+        },
+        {
+          "description": "Enables the save command",
+          "type": "string",
+          "const": "allow-save",
+          "markdownDescription": "Enables the save command"
+        },
+        {
+          "description": "Enables the set_property command",
+          "type": "string",
+          "const": "allow-set-property",
+          "markdownDescription": "Enables the set_property command"
         },
         {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",

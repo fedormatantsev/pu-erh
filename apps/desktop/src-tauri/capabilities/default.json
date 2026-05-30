@@ -6,6 +6,10 @@
   "permissions": [
     "core:default",
     "allow-ping",
-    "allow-root-id"
+    "allow-root-id",
+    "allow-block",
+    "allow-children",
+    "allow-set-property",
+    "allow-save"
   ]
 }

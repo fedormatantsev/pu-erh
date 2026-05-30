@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-set-property"
+description = "Enables the set_property command"
+commands.allow = ["set_property"]

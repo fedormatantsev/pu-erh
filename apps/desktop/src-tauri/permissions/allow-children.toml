@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-children"
+description = "Enables the children command"
+commands.allow = ["children"]
