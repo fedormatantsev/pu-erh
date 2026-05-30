@@ -5,7 +5,7 @@ use graph::{BlockVersion, EdgeVersion, KnowledgeBase};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-pub const FORMAT_VERSION: u32 = 1;
+pub const FORMAT_VERSION: u32 = 2;
 
 #[derive(Debug, Error)]
 pub enum StorageError {
@@ -17,7 +17,7 @@ pub enum StorageError {
     Invalid(String),
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct KnowledgeBaseFile {
     pub format_version: u32,
     pub block_versions: Vec<BlockVersion>,
@@ -161,6 +161,94 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().join("legacy.json");
         fs::write(&path, r#"{"blocks":[],"edges":[]}"#).unwrap();
+        let err = load(&path).unwrap_err();
+        assert!(matches!(err, StorageError::Invalid(_)));
+    }
+
+    #[test]
+    fn format_version_one_is_rejected() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("v1.json");
+        fs::write(
+            &path,
+            r#"{"format_version":1,"block_versions":[],"edge_versions":[]}"#,
+        )
+        .unwrap();
+        let err = load(&path).unwrap_err();
+        match err {
+            StorageError::Invalid(msg) => assert!(msg.contains("unsupported format_version 1")),
+            other => panic!("expected invalid storage error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn null_property_round_trips() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("kb.json");
+
+        let mut props = Properties::new();
+        props.insert("note".into(), graph::PropertyValue::Null);
+
+        let mut kb = KnowledgeBase::empty();
+        let id = Uuid::new_v4();
+        kb.append_block_version(id, false, props);
+        save(&path, &kb).unwrap();
+
+        let loaded = load(&path).unwrap();
+        let block = loaded.get_block(id).unwrap();
+        assert_eq!(block.properties.get("note"), Some(&graph::PropertyValue::Null));
+    }
+
+    #[test]
+    fn array_property_value_is_rejected() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("kb.json");
+        let id = Uuid::new_v4();
+        fs::write(
+            &path,
+            format!(
+                r#"{{
+  "format_version": 2,
+  "block_versions": [{{
+    "id": "{id}",
+    "version": 1,
+    "digest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "tombstoned": false,
+    "properties": {{ "tags": [] }}
+  }}],
+  "edge_versions": []
+}}"#
+            ),
+        )
+        .unwrap();
+
+        let err = load(&path).unwrap_err();
+        assert!(matches!(err, StorageError::Invalid(_)));
+    }
+
+    #[test]
+    fn object_property_value_is_rejected() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("kb.json");
+        let id = Uuid::new_v4();
+        fs::write(
+            &path,
+            format!(
+                r#"{{
+  "format_version": 2,
+  "block_versions": [{{
+    "id": "{id}",
+    "version": 1,
+    "digest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "tombstoned": false,
+    "properties": {{ "meta": {{}} }}
+  }}],
+  "edge_versions": []
+}}"#
+            ),
+        )
+        .unwrap();
+
         let err = load(&path).unwrap_err();
         assert!(matches!(err, StorageError::Invalid(_)));
     }

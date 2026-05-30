@@ -40,7 +40,7 @@ The CLI MUST provide a `query` subcommand that accepts a query expression and pr
 #### Scenario: Query output format
 
 - **WHEN** the user runs a query that returns one or more blocks
-- **THEN** each result line is printed as `<uuid> <json-properties>` (UUID, space, JSON object of properties)
+- **THEN** each result line is printed as `<uuid> <json-properties>` (UUID, space, JSON object whose values are only JSON strings, numbers, booleans, or `null`)
 - **AND** lines are separated by newlines
 
 ### Requirement: Create subcommand

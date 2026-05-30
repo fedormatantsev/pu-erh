@@ -250,7 +250,6 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "serde",
- "serde_json",
  "thiserror",
  "uuid",
 ]
@@ -393,7 +392,6 @@ dependencies = [
  "clap",
  "graph",
  "pu-erh-core",
- "serde_json",
  "tempfile",
  "uuid",
 ]
@@ -403,7 +401,6 @@ name = "pu-erh-core"
 version = "0.1.0"
 dependencies = [
  "graph",
- "serde_json",
  "storage",
  "tempfile",
  "thiserror",

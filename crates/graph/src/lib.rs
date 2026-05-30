@@ -1,6 +1,7 @@
 mod bitmask256;
 mod digest;
 mod model;
+mod property_value;
 mod radix_trie;
 mod snapshot;
 mod trie_key;
@@ -8,6 +9,7 @@ mod version;
 
 pub use digest::{Digest, DigestError};
 pub use model::{Block, Edge, EdgeType, GraphError, Properties};
+pub use property_value::{properties_to_json_string, PropertyValue};
 pub use radix_trie::{DiffKind, RadixTrieMap, TrieDiffEntry};
 pub use snapshot::{BlockOrEdge, KnowledgeBase, Snapshot, SnapshotDiffEntity, SnapshotDiffEntry};
 pub use trie_key::{

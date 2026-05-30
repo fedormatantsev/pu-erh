@@ -4,7 +4,7 @@ use uuid::Uuid;
 use crate::digest::{hash_block_content, hash_edge_content, Digest, DigestError};
 use crate::model::{EdgeType, Properties};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BlockVersion {
     pub id: Uuid,
     pub version: u64,
@@ -28,7 +28,7 @@ impl BlockVersion {
         tombstoned: bool,
         properties: Properties,
     ) -> Result<Self, DigestError> {
-        let digest = hash_block_content(id, version, tombstoned, &properties)?;
+        let digest = hash_block_content(id, version, tombstoned, &properties);
         Ok(Self {
             id,
             version,
@@ -40,7 +40,7 @@ impl BlockVersion {
     }
 
     pub fn verify_digest(&self) -> Result<(), DigestError> {
-        let expected = hash_block_content(self.id, self.version, self.tombstoned, &self.properties)?;
+        let expected = hash_block_content(self.id, self.version, self.tombstoned, &self.properties);
         if expected != self.digest {
             return Err(DigestError::Mismatch);
         }
@@ -48,7 +48,7 @@ impl BlockVersion {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EdgeVersion {
     pub source: Uuid,
     pub target: Uuid,
@@ -84,7 +84,7 @@ impl EdgeVersion {
             version,
             tombstoned,
             &properties,
-        )?;
+        );
         Ok(Self {
             source,
             target,
@@ -105,7 +105,7 @@ impl EdgeVersion {
             self.version,
             self.tombstoned,
             &self.properties,
-        )?;
+        );
         if expected != self.digest {
             return Err(DigestError::Mismatch);
         }

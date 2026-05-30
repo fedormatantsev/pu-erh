@@ -83,6 +83,6 @@ fn run() -> Result<()> {
 }
 
 fn format_block(block: &graph::Block) -> String {
-    let properties = serde_json::to_string(&block.properties).unwrap_or_else(|_| "{}".into());
+    let properties = graph::properties_to_json_string(&block.properties);
     format!("{} {}", block.id, properties)
 }

@@ -22,7 +22,7 @@ Each block in the knowledge base MUST have a unique identifier represented as a 
 
 ### Requirement: Block structure
 
-Each block MUST contain an id and a properties map (generic key/value dictionary with string keys and JSON-compatible values, stored in lexicographic key order). Blocks MUST NOT have a type field or embed parent or other relation fields — relations are represented as edges.
+Each block MUST contain an id and a properties map (string keys in lexicographic order, values as `PropertyValue`: string, number (`f64`), boolean, or null). Blocks MUST NOT have a type field or embed parent or other relation fields — relations are represented as edges.
 
 #### Scenario: Block fields are accessible
 
@@ -34,9 +34,14 @@ Each block MUST contain an id and a properties map (generic key/value dictionary
 - **WHEN** a block is created without explicit properties
 - **THEN** its properties map is empty
 
+#### Scenario: Property value is a supported type
+
+- **WHEN** a property is set on a block in memory
+- **THEN** its value is one of `PropertyValue::String`, `PropertyValue::Number`, `PropertyValue::Boolean`, or `PropertyValue::Null`
+
 ### Requirement: Edge structure
 
-Each edge MUST have a source id, a target id, an edge type represented as a `#[repr(u8)]` enum, and a properties map (generic key/value dictionary with string keys and JSON-compatible values, stored in lexicographic key order).
+Each edge MUST have a source id, a target id, an edge type represented as a `#[repr(u8)]` enum, and a properties map (string keys in lexicographic order, values as `PropertyValue`: string, number (`f64`), boolean, or null).
 
 #### Scenario: Edge fields are accessible
 
@@ -52,6 +57,11 @@ Each edge MUST have a source id, a target id, an edge type represented as a `#[r
 
 - **WHEN** an edge is created without explicit properties
 - **THEN** its properties map is empty
+
+#### Scenario: Property value is a supported type
+
+- **WHEN** a property is set on an edge in memory
+- **THEN** its value is one of `PropertyValue::String`, `PropertyValue::Number`, `PropertyValue::Boolean`, or `PropertyValue::Null`
 
 ### Requirement: Edge key
 

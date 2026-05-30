@@ -141,7 +141,7 @@ impl KnowledgeBase {
             .unwrap_or(1);
         let previous_digest = self.crdt_winner_block(id).map(|winner| winner.digest);
         let record = BlockVersion::new(id, version, previous_digest, tombstoned, properties)
-            .expect("block properties must be JSON-serializable");
+            .expect("block version digest must match");
         self.insert_block_record(record.clone());
         record
     }
@@ -170,7 +170,7 @@ impl KnowledgeBase {
             tombstoned,
             properties,
         )
-        .expect("edge properties must be JSON-serializable");
+        .expect("edge version digest must match");
         self.insert_edge_record(record.clone());
         record
     }
@@ -519,6 +519,7 @@ fn explicit_crdt_winner_edge(
 mod tests {
     use super::*;
     use crate::model::EdgeType;
+    use crate::property_value::PropertyValue;
     use crate::version::EdgeIdentity;
 
     #[test]
@@ -528,16 +529,16 @@ mod tests {
         kb.append_block_version(
             id,
             false,
-            Properties::from([("v".into(), serde_json::json!(1))]),
+            Properties::from([("v".into(), PropertyValue::Number(1.0))]),
         );
         kb.append_block_version(
             id,
             false,
-            Properties::from([("v".into(), serde_json::json!(2))]),
+            Properties::from([("v".into(), PropertyValue::Number(2.0))]),
         );
         assert_eq!(
             kb.get_block(id).unwrap().properties["v"],
-            serde_json::json!(2)
+            PropertyValue::Number(2.0)
         );
     }
 

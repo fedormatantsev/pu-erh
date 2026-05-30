@@ -5,7 +5,9 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
 use uuid::Uuid;
 
-pub type Properties = BTreeMap<String, serde_json::Value>;
+use crate::property_value::PropertyValue;
+
+pub type Properties = BTreeMap<String, PropertyValue>;
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
