@@ -1,8 +1,5 @@
-# storage Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change walking-skeleton. Update Purpose after archive.
-## Requirements
 ### Requirement: Serialize knowledge base to file
 
 The system MUST persist a knowledge base by exporting all block and edge version records from the in-memory version tries into a single versioned JSON file (`format_version`, `block_versions`, `edge_versions`).
@@ -12,6 +9,8 @@ The system MUST persist a knowledge base by exporting all block and edge version
 - **WHEN** a knowledge base with version records is saved and loaded
 - **THEN** the set of version records is identical to before save
 - **AND** active graph semantics after load match those before save
+
+## ADDED Requirements
 
 ### Requirement: Load builds trie from file
 
@@ -27,27 +26,3 @@ When loading from storage, the system MUST construct the in-memory knowledge bas
 - **WHEN** a knowledge base is saved
 - **THEN** block and edge version records are collected from trie iteration for JSON serialization
 - **AND** no separate in-memory vector is the save source of truth
-
-### Requirement: Load missing file as new graph
-
-When loading from a path that does not exist, the system MUST initialize an empty knowledge base rather than returning an error.
-
-#### Scenario: First use of new path
-
-- **WHEN** storage is loaded from a path that does not exist
-- **THEN** the result is an empty knowledge base with no records
-
-### Requirement: Reject invalid storage
-
-When loading from a path that exists but contains invalid JSON, an unsupported format version, or records that cannot be parsed, the system MUST return an error.
-
-#### Scenario: Corrupt file
-
-- **WHEN** storage is loaded from a file containing malformed JSON
-- **THEN** the system returns an error describing the load failure
-
-#### Scenario: Unsupported format version
-
-- **WHEN** storage is loaded from a file with an unsupported `format_version`
-- **THEN** the system returns an error describing the version mismatch
-

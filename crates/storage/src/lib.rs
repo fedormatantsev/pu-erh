@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use graph::{merge_histories, BlockVersion, EdgeVersion, VersionHistory};
+use graph::{BlockVersion, EdgeVersion, KnowledgeBase};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -24,9 +24,9 @@ pub struct KnowledgeBaseFile {
     pub edge_versions: Vec<EdgeVersion>,
 }
 
-pub fn load(path: &Path) -> Result<VersionHistory, StorageError> {
+pub fn load(path: &Path) -> Result<KnowledgeBase, StorageError> {
     if !path.exists() {
-        return Ok(VersionHistory::default());
+        return Ok(KnowledgeBase::empty());
     }
 
     let contents = fs::read_to_string(path).map_err(|err| StorageError::Read(err.to_string()))?;
@@ -40,17 +40,17 @@ pub fn load(path: &Path) -> Result<VersionHistory, StorageError> {
         )));
     }
 
-    Ok(VersionHistory {
-        block_versions: file.block_versions,
-        edge_versions: file.edge_versions,
-    })
+    Ok(KnowledgeBase::from_records(
+        file.block_versions,
+        file.edge_versions,
+    ))
 }
 
-pub fn save(path: &Path, history: &VersionHistory) -> Result<(), StorageError> {
+pub fn save(path: &Path, kb: &KnowledgeBase) -> Result<(), StorageError> {
     let file = KnowledgeBaseFile {
         format_version: FORMAT_VERSION,
-        block_versions: history.block_versions.clone(),
-        edge_versions: history.edge_versions.clone(),
+        block_versions: kb.block_version_records(),
+        edge_versions: kb.edge_version_records(),
     };
 
     let contents =
@@ -65,46 +65,41 @@ pub fn save(path: &Path, history: &VersionHistory) -> Result<(), StorageError> {
     fs::write(path, contents).map_err(|err| StorageError::Write(err.to_string()))
 }
 
-pub fn merge_histories_from_paths(
+pub fn merge_knowledge_bases_from_paths(
     left: &Path,
     right: &Path,
-) -> Result<VersionHistory, StorageError> {
-    let left_history = load(left)?;
-    let right_history = load(right)?;
-    Ok(merge_histories(&left_history, &right_history))
+) -> Result<KnowledgeBase, StorageError> {
+    let left_kb = load(left)?;
+    let right_kb = load(right)?;
+    Ok(left_kb.merge(&right_kb))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use graph::{
-        append_block_version, append_edge_version, create_root_block_version, EdgeType, Properties,
-        Snapshot,
-    };
+    use graph::{EdgeType, Properties};
     use tempfile::tempdir;
     use uuid::Uuid;
 
     #[test]
-    fn missing_file_returns_empty_history() {
+    fn missing_file_returns_empty_knowledge_base() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("missing.json");
-        let history = load(&path).unwrap();
-        assert!(history.block_versions.is_empty());
-        assert!(history.edge_versions.is_empty());
+        let kb = load(&path).unwrap();
+        assert!(kb.is_empty());
     }
 
     #[test]
-    fn round_trip_preserves_versions_and_materializes() {
+    fn round_trip_preserves_versions_and_reads() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("kb.json");
 
-        let mut history = VersionHistory::default();
+        let mut kb = KnowledgeBase::empty();
         let root = Uuid::new_v4();
-        history.append_block(create_root_block_version(root));
+        kb.append_root_block(root);
         let child = Uuid::new_v4();
-        append_block_version(&mut history, child, false, Properties::new());
-        append_edge_version(
-            &mut history,
+        kb.append_block_version(child, false, Properties::new());
+        kb.append_edge_version(
             child,
             root,
             EdgeType::Parent,
@@ -112,35 +107,33 @@ mod tests {
             Properties::new(),
         );
 
-        save(&path, &history).unwrap();
+        save(&path, &kb).unwrap();
         let loaded = load(&path).unwrap();
 
-        assert_eq!(loaded.block_versions.len(), 2);
-        assert_eq!(loaded.edge_versions.len(), 1);
-
-        let snapshot = Snapshot::materialize(&loaded);
-        assert_eq!(snapshot.root_id().unwrap(), root);
-        assert_eq!(snapshot.block_count(), 2);
-        assert_eq!(snapshot.children(root).unwrap().len(), 1);
+        assert_eq!(loaded.block_version_records().len(), 2);
+        assert_eq!(loaded.edge_version_records().len(), 1);
+        assert_eq!(loaded.root_id().unwrap(), root);
+        assert_eq!(loaded.block_count(), 2);
+        assert_eq!(loaded.children(root).unwrap().len(), 1);
     }
 
     #[test]
-    fn merge_histories_unions_by_digest() {
+    fn merge_knowledge_bases_unions_by_key() {
         let dir = tempdir().unwrap();
         let left_path = dir.path().join("left.json");
         let right_path = dir.path().join("right.json");
 
-        let mut left = VersionHistory::default();
+        let mut left = KnowledgeBase::empty();
         let root = Uuid::new_v4();
-        left.append_block(create_root_block_version(root));
+        left.append_root_block(root);
         save(&left_path, &left).unwrap();
 
-        let mut right = VersionHistory::default();
-        append_block_version(&mut right, Uuid::new_v4(), false, Properties::new());
+        let mut right = KnowledgeBase::empty();
+        right.append_block_version(Uuid::new_v4(), false, Properties::new());
         save(&right_path, &right).unwrap();
 
-        let merged = merge_histories_from_paths(&left_path, &right_path).unwrap();
-        assert_eq!(merged.block_versions.len(), 2);
+        let merged = merge_knowledge_bases_from_paths(&left_path, &right_path).unwrap();
+        assert_eq!(merged.block_version_records().len(), 2);
     }
 
     #[test]

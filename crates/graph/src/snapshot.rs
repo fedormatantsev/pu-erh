@@ -2,19 +2,22 @@ use std::collections::HashSet;
 
 use uuid::Uuid;
 
-use crate::model::{Block, Edge, EdgeType, GraphError};
+use crate::model::{Block, Edge, EdgeType, GraphError, Properties};
 use crate::radix_trie::{DiffKind, RadixTrieMap, TrieDiffEntry};
 use crate::trie_key::{
     block_entity_prefix, block_version_key_from, edge_entity_prefix, edge_nav_prefix,
     edge_version_key_from, BLOCK_ENTITY_PREFIX_LEN, EDGE_ENTITY_PREFIX_LEN,
 };
-use crate::version::{BlockVersion, EdgeVersion, VersionHistory};
+use crate::version::{BlockVersion, EdgeIdentity, EdgeVersion};
 
 #[derive(Debug, Clone)]
-pub struct Snapshot {
+pub struct KnowledgeBase {
     block_versions: RadixTrieMap<BlockVersion>,
     edge_versions: RadixTrieMap<EdgeVersion>,
 }
+
+/// Deprecated alias; use [`KnowledgeBase`].
+pub type Snapshot = KnowledgeBase;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SnapshotDiffEntity {
@@ -40,7 +43,7 @@ pub enum BlockOrEdge {
     Edge(Edge),
 }
 
-impl Default for Snapshot {
+impl Default for KnowledgeBase {
     fn default() -> Self {
         Self {
             block_versions: RadixTrieMap::new(),
@@ -49,42 +52,143 @@ impl Default for Snapshot {
     }
 }
 
-impl Snapshot {
+impl KnowledgeBase {
     pub fn empty() -> Self {
         Self::default()
     }
 
-    pub fn materialize(history: &VersionHistory) -> Self {
-        Self::materialize_from(None, history)
+    pub fn is_empty(&self) -> bool {
+        self.block_versions.is_empty() && self.edge_versions.is_empty()
     }
 
-    pub fn materialize_from(previous: Option<&Snapshot>, history: &VersionHistory) -> Self {
-        let mut block_versions = previous
-            .map(|snapshot| snapshot.block_versions.clone())
-            .unwrap_or_default();
-        let mut edge_versions = previous
-            .map(|snapshot| snapshot.edge_versions.clone())
-            .unwrap_or_default();
-
-        for version in &history.block_versions {
-            let key = block_version_key_from(version);
-            block_versions = block_versions.insert(&key, version.clone());
+    pub fn from_records(
+        block_versions: impl IntoIterator<Item = BlockVersion>,
+        edge_versions: impl IntoIterator<Item = EdgeVersion>,
+    ) -> Self {
+        let mut kb = Self::empty();
+        for record in block_versions {
+            kb.insert_block_record(record);
         }
-
-        for version in &history.edge_versions {
-            let key = edge_version_key_from(version);
-            edge_versions = edge_versions.insert(&key, version.clone());
+        for record in edge_versions {
+            kb.insert_edge_record(record);
         }
+        kb
+    }
 
+    pub fn merge(&self, other: &Self) -> Self {
+        let mut block_versions = self.block_versions.clone();
+        for (key, value) in other.block_versions.iter() {
+            block_versions = block_versions.insert(key, value.clone());
+        }
+        let mut edge_versions = self.edge_versions.clone();
+        for (key, value) in other.edge_versions.iter() {
+            edge_versions = edge_versions.insert(key, value.clone());
+        }
         Self {
             block_versions,
             edge_versions,
         }
     }
 
-    fn active_block_version(&self, id: Uuid) -> Option<&BlockVersion> {
+    pub fn block_version_records(&self) -> Vec<BlockVersion> {
+        let mut records: Vec<_> = self
+            .block_versions
+            .iter()
+            .map(|(_, version)| version.clone())
+            .collect();
+        records.sort_by_key(block_version_key_from);
+        records
+    }
+
+    pub fn edge_version_records(&self) -> Vec<EdgeVersion> {
+        let mut records: Vec<_> = self
+            .edge_versions
+            .iter()
+            .map(|(_, version)| version.clone())
+            .collect();
+        records.sort_by_key(edge_version_key_from);
+        records
+    }
+
+    pub fn crdt_winner_block(&self, id: Uuid) -> Option<&BlockVersion> {
         let prefix = block_entity_prefix(id);
-        let (_, version) = self.block_versions.winner_under_prefix(&prefix)?;
+        self.block_versions
+            .winner_under_prefix(&prefix)
+            .map(|(_, version)| version)
+    }
+
+    pub fn crdt_winner_edge(
+        &self,
+        source: Uuid,
+        target: Uuid,
+        edge_type: EdgeType,
+    ) -> Option<&EdgeVersion> {
+        let entity = edge_entity_prefix(target, edge_type, source);
+        self.edge_versions
+            .winner_under_prefix(&entity)
+            .map(|(_, version)| version)
+    }
+
+    pub fn append_block_version(
+        &mut self,
+        id: Uuid,
+        tombstoned: bool,
+        properties: Properties,
+    ) -> BlockVersion {
+        let version = self
+            .crdt_winner_block(id)
+            .map(|winner| winner.version + 1)
+            .unwrap_or(1);
+        let previous_digest = self.crdt_winner_block(id).map(|winner| winner.digest);
+        let record = BlockVersion::new(id, version, previous_digest, tombstoned, properties);
+        self.insert_block_record(record.clone());
+        record
+    }
+
+    pub fn append_edge_version(
+        &mut self,
+        source: Uuid,
+        target: Uuid,
+        edge_type: EdgeType,
+        tombstoned: bool,
+        properties: Properties,
+    ) -> EdgeVersion {
+        let version = self
+            .crdt_winner_edge(source, target, edge_type)
+            .map(|winner| winner.version + 1)
+            .unwrap_or(1);
+        let previous_digest = self
+            .crdt_winner_edge(source, target, edge_type)
+            .map(|winner| winner.digest);
+        let record = EdgeVersion::new(
+            source,
+            target,
+            edge_type,
+            version,
+            previous_digest,
+            tombstoned,
+            properties,
+        );
+        self.insert_edge_record(record.clone());
+        record
+    }
+
+    pub fn append_root_block(&mut self, root_id: Uuid) -> BlockVersion {
+        self.append_block_version(root_id, false, Properties::new())
+    }
+
+    fn insert_block_record(&mut self, record: BlockVersion) {
+        let key = block_version_key_from(&record);
+        self.block_versions = self.block_versions.insert(&key, record);
+    }
+
+    fn insert_edge_record(&mut self, record: EdgeVersion) {
+        let key = edge_version_key_from(&record);
+        self.edge_versions = self.edge_versions.insert(&key, record);
+    }
+
+    fn active_block_version(&self, id: Uuid) -> Option<&BlockVersion> {
+        let version = self.crdt_winner_block(id)?;
         if version.tombstoned {
             return None;
         }
@@ -99,8 +203,7 @@ impl Snapshot {
     }
 
     fn active_edge(&self, target: Uuid, edge_type: EdgeType, source: Uuid) -> Option<Edge> {
-        let entity = edge_entity_prefix(target, edge_type, source);
-        let (_, version) = self.edge_versions.winner_under_prefix(&entity)?;
+        let version = self.crdt_winner_edge(source, target, edge_type)?;
         if version.tombstoned {
             return None;
         }
@@ -200,7 +303,9 @@ impl Snapshot {
         if self.active_block(id).is_none() {
             return Err(GraphError::BlockNotFound(id));
         }
-        Ok(self.parent_of(id).and_then(|parent_id| self.active_block(parent_id)))
+        Ok(self
+            .parent_of(id)
+            .and_then(|parent_id| self.active_block(parent_id)))
     }
 
     pub fn children(&self, id: Uuid) -> Result<Vec<Block>, GraphError> {
@@ -293,8 +398,8 @@ impl Snapshot {
 pub struct SnapshotDiff<'a> {
     block_diff: crate::radix_trie::TrieDiff<'a, BlockVersion>,
     edge_diff: crate::radix_trie::TrieDiff<'a, EdgeVersion>,
-    left: &'a Snapshot,
-    right: &'a Snapshot,
+    left: &'a KnowledgeBase,
+    right: &'a KnowledgeBase,
     block_done: bool,
     edge_done: bool,
 }
@@ -321,8 +426,8 @@ impl<'a> Iterator for SnapshotDiff<'a> {
 
 fn decode_block_diff(
     entry: TrieDiffEntry<'_, BlockVersion>,
-    left: &Snapshot,
-    right: &Snapshot,
+    left: &KnowledgeBase,
+    right: &KnowledgeBase,
 ) -> SnapshotDiffEntry {
     let id = Uuid::from_bytes(entry.key[..16].try_into().expect("block id"));
     SnapshotDiffEntry {
@@ -335,8 +440,8 @@ fn decode_block_diff(
 
 fn decode_edge_diff(
     entry: TrieDiffEntry<'_, EdgeVersion>,
-    left: &Snapshot,
-    right: &Snapshot,
+    left: &KnowledgeBase,
+    right: &KnowledgeBase,
 ) -> SnapshotDiffEntry {
     let target = Uuid::from_bytes(entry.key[..16].try_into().expect("target"));
     let edge_type = edge_type_from_entity_byte(entry.key[16]).unwrap_or(EdgeType::Parent);
@@ -375,47 +480,73 @@ fn edge_from_version(version: &EdgeVersion) -> Edge {
 }
 
 #[cfg(test)]
+fn explicit_crdt_winner_block(kb: &KnowledgeBase, id: Uuid) -> Option<BlockVersion> {
+    kb.block_version_records()
+        .into_iter()
+        .filter(|version| version.id == id)
+        .max_by(|left, right| {
+            left.version
+                .cmp(&right.version)
+                .then_with(|| left.digest.cmp(&right.digest))
+        })
+}
+
+#[cfg(test)]
+fn explicit_crdt_winner_edge(
+    kb: &KnowledgeBase,
+    identity: &EdgeIdentity,
+) -> Option<EdgeVersion> {
+    kb.edge_version_records()
+        .into_iter()
+        .filter(|version| {
+            version.source == identity.source
+                && version.target == identity.target
+                && version.edge_type == identity.edge_type
+        })
+        .max_by(|left, right| {
+            left.version
+                .cmp(&right.version)
+                .then_with(|| left.digest.cmp(&right.digest))
+        })
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{EdgeType, Properties};
-    use crate::version::{append_block_version, append_edge_version, create_root_block_version};
+    use crate::model::EdgeType;
 
     #[test]
-    fn materialize_picks_highest_version() {
-        let mut history = VersionHistory::default();
+    fn append_picks_highest_version() {
+        let mut kb = KnowledgeBase::empty();
         let id = Uuid::new_v4();
-        append_block_version(
-            &mut history,
+        kb.append_block_version(
             id,
             false,
             Properties::from([("v".into(), serde_json::json!(1))]),
         );
-        append_block_version(
-            &mut history,
+        kb.append_block_version(
             id,
             false,
             Properties::from([("v".into(), serde_json::json!(2))]),
         );
-        let snapshot = Snapshot::materialize(&history);
         assert_eq!(
-            snapshot.get_block(id).unwrap().properties["v"],
+            kb.get_block(id).unwrap().properties["v"],
             serde_json::json!(2)
         );
     }
 
     #[test]
     fn tombstoned_winner_excludes_block() {
-        let mut history = VersionHistory::default();
+        let mut kb = KnowledgeBase::empty();
         let id = Uuid::new_v4();
-        append_block_version(&mut history, id, false, Properties::new());
-        append_block_version(&mut history, id, true, Properties::new());
-        let snapshot = Snapshot::materialize(&history);
-        assert!(snapshot.get_block(id).is_none());
+        kb.append_block_version(id, false, Properties::new());
+        kb.append_block_version(id, true, Properties::new());
+        assert!(kb.get_block(id).is_none());
     }
 
     #[test]
     fn digest_tie_break_picks_lexicographically_larger() {
-        let mut history = VersionHistory::default();
+        let mut kb = KnowledgeBase::empty();
         let id = Uuid::new_v4();
         let mut first = BlockVersion::new(id, 1, None, false, Properties::new());
         let mut second = BlockVersion::new(id, 1, None, false, Properties::new());
@@ -427,33 +558,21 @@ mod tests {
         } else {
             second.digest
         };
-        history.append_block(first);
-        history.append_block(second);
-        let snapshot = Snapshot::materialize(&history);
-        assert!(snapshot.block(id).is_some());
-        let winner = history
-            .block_versions
-            .iter()
-            .filter(|version| version.id == id)
-            .max_by(|left, right| {
-                left.version
-                    .cmp(&right.version)
-                    .then_with(|| left.digest.cmp(&right.digest))
-            })
-            .unwrap();
-        assert_eq!(winner.digest, expected);
+        kb.insert_block_record(first);
+        kb.insert_block_record(second);
+        assert!(kb.block(id).is_some());
+        assert_eq!(kb.crdt_winner_block(id).unwrap().digest, expected);
     }
 
     #[test]
-    fn branching_histories_converge_on_merge() {
+    fn branching_knowledge_bases_converge_on_merge() {
         let root = Uuid::new_v4();
         let child = Uuid::new_v4();
 
-        let mut left = VersionHistory::default();
-        left.append_block(create_root_block_version(root));
-        append_block_version(&mut left, child, false, Properties::new());
-        append_edge_version(
-            &mut left,
+        let mut left = KnowledgeBase::empty();
+        left.append_root_block(root);
+        left.append_block_version(child, false, Properties::new());
+        left.append_edge_version(
             child,
             root,
             EdgeType::Parent,
@@ -461,11 +580,10 @@ mod tests {
             Properties::new(),
         );
 
-        let mut right = VersionHistory::default();
-        right.append_block(create_root_block_version(root));
-        append_block_version(&mut right, child, false, Properties::new());
-        append_edge_version(
-            &mut right,
+        let mut right = KnowledgeBase::empty();
+        right.append_root_block(root);
+        right.append_block_version(child, false, Properties::new());
+        right.append_edge_version(
             child,
             root,
             EdgeType::Parent,
@@ -473,43 +591,106 @@ mod tests {
             Properties::new(),
         );
 
-        let merged = crate::version::merge_histories(&left, &right);
-        let snapshot = Snapshot::materialize(&merged);
-        assert_eq!(snapshot.block_count(), 2);
-        assert_eq!(snapshot.parent_of(child), Some(root));
+        let merged = left.merge(&right);
+        assert_eq!(merged.block_count(), 2);
+        assert_eq!(merged.parent_of(child), Some(root));
     }
 
     #[test]
-    fn identical_histories_share_trie_roots() {
-        let mut history = VersionHistory::default();
+    fn identical_knowledge_bases_share_trie_roots() {
+        let mut kb = KnowledgeBase::empty();
         let root = Uuid::new_v4();
-        history.append_block(create_root_block_version(root));
-        let left = Snapshot::materialize(&history);
+        kb.append_root_block(root);
+        let left = kb.clone();
         let right = left.clone();
         assert_eq!(left.diff(&right).count(), 0);
     }
 
     #[test]
-    fn incremental_materialize_matches_full_rebuild() {
-        let mut history = VersionHistory::default();
+    fn per_call_reads_recompute_without_cache() {
+        let mut kb = KnowledgeBase::empty();
         let root = Uuid::new_v4();
-        history.append_block(create_root_block_version(root));
-        let partial = Snapshot::materialize(&history);
-        append_block_version(&mut history, Uuid::new_v4(), false, Properties::new());
-        let incremental = Snapshot::materialize_from(Some(&partial), &history);
-        let full = Snapshot::materialize(&history);
-        assert_eq!(incremental.block_count(), full.block_count());
-        assert_eq!(incremental.edge_count(), full.edge_count());
+        kb.append_root_block(root);
+        assert_eq!(kb.root_id().unwrap(), root);
+        assert_eq!(kb.block_count(), 1);
+        assert_eq!(kb.block_count(), kb.blocks().len());
     }
 
     #[test]
-    fn per_call_reads_recompute_without_cache() {
-        let mut history = VersionHistory::default();
-        let root = Uuid::new_v4();
-        history.append_block(create_root_block_version(root));
-        let snapshot = Snapshot::materialize(&history);
-        assert_eq!(snapshot.root_id().unwrap(), root);
-        assert_eq!(snapshot.block_count(), 1);
-        assert_eq!(snapshot.block_count(), snapshot.blocks().len());
+    fn crdt_winner_matches_explicit_scan_for_blocks() {
+        let mut kb = KnowledgeBase::empty();
+        let id = Uuid::new_v4();
+        kb.append_block_version(id, false, Properties::new());
+        kb.append_block_version(id, false, Properties::new());
+        kb.append_block_version(id, true, Properties::new());
+
+        let trie_winner = kb.crdt_winner_block(id).unwrap().clone();
+        let scan_winner = explicit_crdt_winner_block(&kb, id).unwrap();
+        assert_eq!(trie_winner.digest, scan_winner.digest);
+        assert_eq!(trie_winner.version, scan_winner.version);
+    }
+
+    #[test]
+    fn crdt_winner_matches_explicit_scan_for_edges() {
+        let mut kb = KnowledgeBase::empty();
+        let source = Uuid::new_v4();
+        let target = Uuid::new_v4();
+        kb.append_edge_version(
+            source,
+            target,
+            EdgeType::Parent,
+            false,
+            Properties::new(),
+        );
+        kb.append_edge_version(
+            source,
+            target,
+            EdgeType::Parent,
+            true,
+            Properties::new(),
+        );
+
+        let identity = EdgeIdentity {
+            source,
+            target,
+            edge_type: EdgeType::Parent,
+        };
+        let trie_winner = kb
+            .crdt_winner_edge(source, target, EdgeType::Parent)
+            .unwrap()
+            .clone();
+        let scan_winner = explicit_crdt_winner_edge(&kb, &identity).unwrap();
+        assert_eq!(trie_winner.digest, scan_winner.digest);
+    }
+
+    #[test]
+    fn append_edge_links_previous_digest() {
+        let mut kb = KnowledgeBase::empty();
+        let source = Uuid::new_v4();
+        let target = Uuid::new_v4();
+        let first = kb.append_edge_version(
+            source,
+            target,
+            EdgeType::Parent,
+            false,
+            Properties::new(),
+        );
+        let second = kb.append_edge_version(
+            source,
+            target,
+            EdgeType::Parent,
+            true,
+            Properties::new(),
+        );
+        assert_eq!(second.previous_digest, Some(first.digest));
+    }
+
+    #[test]
+    fn merge_dedupes_identical_records() {
+        let mut left = KnowledgeBase::empty();
+        let id = Uuid::new_v4();
+        left.append_block_version(id, false, Properties::new());
+        let merged = left.merge(&left);
+        assert_eq!(merged.block_version_records().len(), 1);
     }
 }

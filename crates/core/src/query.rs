@@ -1,16 +1,16 @@
-use graph::{Block, Snapshot};
+use graph::{Block, KnowledgeBase};
 use uuid::Uuid;
 
 use crate::error::CoreError;
 
-pub fn execute(snapshot: &Snapshot, expression: &str) -> Result<Vec<Block>, CoreError> {
+pub fn execute(kb: &KnowledgeBase, expression: &str) -> Result<Vec<Block>, CoreError> {
     let (kind, id) = parse(expression)?;
     match kind {
-        QueryKind::Parent => match snapshot.parent(id)? {
+        QueryKind::Parent => match kb.parent(id)? {
             Some(block) => Ok(vec![block]),
             None => Ok(Vec::new()),
         },
-        QueryKind::Children => snapshot.children(id).map_err(CoreError::from),
+        QueryKind::Children => kb.children(id).map_err(CoreError::from),
     }
 }
 
@@ -40,68 +40,63 @@ fn parse_uuid(value: &str) -> Result<Uuid, CoreError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use graph::{
-        append_block_version, append_edge_version, create_root_block_version, EdgeType, Properties,
-        Snapshot, VersionHistory,
-    };
+    use graph::{EdgeType, KnowledgeBase, Properties};
 
-    fn test_snapshot() -> (Snapshot, Uuid, Uuid) {
-        let mut history = VersionHistory::default();
+    fn test_knowledge_base() -> (KnowledgeBase, Uuid, Uuid) {
+        let mut kb = KnowledgeBase::empty();
         let root = uuid::Uuid::new_v4();
-        history.append_block(create_root_block_version(root));
+        kb.append_root_block(root);
         let child = uuid::Uuid::new_v4();
-        append_block_version(&mut history, child, false, Properties::new());
-        append_edge_version(
-            &mut history,
+        kb.append_block_version(child, false, Properties::new());
+        kb.append_edge_version(
             child,
             root,
             EdgeType::Parent,
             false,
             Properties::new(),
         );
-        (Snapshot::materialize(&history), root, child)
+        (kb, root, child)
     }
 
     #[test]
     fn parent_and_children_queries() {
-        let (snapshot, root, child) = test_snapshot();
+        let (kb, root, child) = test_knowledge_base();
 
-        let parent = execute(&snapshot, &format!("parent:{child}")).unwrap();
+        let parent = execute(&kb, &format!("parent:{child}")).unwrap();
         assert_eq!(parent.len(), 1);
         assert_eq!(parent[0].id, root);
 
-        let children = execute(&snapshot, &format!("children:{root}")).unwrap();
+        let children = execute(&kb, &format!("children:{root}")).unwrap();
         assert_eq!(children.len(), 1);
         assert_eq!(children[0].id, child);
     }
 
     #[test]
     fn root_parent_query_is_empty() {
-        let mut history = VersionHistory::default();
+        let mut kb = KnowledgeBase::empty();
         let root = uuid::Uuid::new_v4();
-        history.append_block(create_root_block_version(root));
-        let snapshot = Snapshot::materialize(&history);
-        let result = execute(&snapshot, &format!("parent:{root}")).unwrap();
+        kb.append_root_block(root);
+        let result = execute(&kb, &format!("parent:{root}")).unwrap();
         assert!(result.is_empty());
     }
 
     #[test]
     fn invalid_syntax_and_uuid_are_errors() {
-        let snapshot = Snapshot::empty();
+        let kb = KnowledgeBase::empty();
         assert!(matches!(
-            execute(&snapshot, "ancestors:abc").unwrap_err(),
+            execute(&kb, "ancestors:abc").unwrap_err(),
             CoreError::InvalidQuerySyntax
         ));
         assert!(matches!(
-            execute(&snapshot, "parent:not-a-uuid").unwrap_err(),
+            execute(&kb, "parent:not-a-uuid").unwrap_err(),
             CoreError::InvalidQueryUuid
         ));
     }
 
     #[test]
     fn unknown_block_is_error() {
-        let snapshot = Snapshot::empty();
+        let kb = KnowledgeBase::empty();
         let missing = uuid::Uuid::new_v4();
-        assert!(execute(&snapshot, &format!("parent:{missing}")).is_err());
+        assert!(execute(&kb, &format!("parent:{missing}")).is_err());
     }
 }

@@ -1,29 +1,21 @@
-use graph::{
-    append_block_version, append_edge_version, EdgeType, GraphError, Properties, Snapshot,
-    VersionHistory,
-};
+use graph::{EdgeType, GraphError, KnowledgeBase, Properties};
 use uuid::Uuid;
 
 use crate::error::CoreError;
 
-// Mutations validate graph invariants before appending versions; snapshot reads assume
+// Mutations validate graph invariants before appending versions; reads assume
 // the active view is already consistent and only apply cheap local checks (tombstone,
 // unknown edge type, missing endpoints on point lookups).
 
-pub fn create_block(
-    history: &mut VersionHistory,
-    snapshot: &Snapshot,
-    parent: Option<Uuid>,
-) -> Result<Uuid, CoreError> {
+pub fn create_block(kb: &mut KnowledgeBase, parent: Option<Uuid>) -> Result<Uuid, CoreError> {
     let parent = parent.ok_or(CoreError::ParentRequired)?;
-    if snapshot.block(parent).is_none() {
+    if kb.block(parent).is_none() {
         return Err(GraphError::BlockNotFound(parent).into());
     }
 
     let id = Uuid::new_v4();
-    append_block_version(history, id, false, Properties::new());
-    append_edge_version(
-        history,
+    kb.append_block_version(id, false, Properties::new());
+    kb.append_edge_version(
         id,
         parent,
         EdgeType::Parent,
@@ -34,29 +26,27 @@ pub fn create_block(
 }
 
 pub fn move_block(
-    history: &mut VersionHistory,
-    snapshot: &Snapshot,
+    kb: &mut KnowledgeBase,
     id: Uuid,
     new_parent: Option<Uuid>,
 ) -> Result<(), CoreError> {
     let new_parent = new_parent.ok_or(CoreError::ParentRequired)?;
 
-    if snapshot.block(id).is_none() {
+    if kb.block(id).is_none() {
         return Err(GraphError::BlockNotFound(id).into());
     }
-    if snapshot.block(new_parent).is_none() {
+    if kb.block(new_parent).is_none() {
         return Err(GraphError::BlockNotFound(new_parent).into());
     }
-    if snapshot.is_root(id) {
+    if kb.is_root(id) {
         return Err(CoreError::CannotMoveRoot);
     }
-    if new_parent == id || is_ancestor(snapshot, id, new_parent)? {
+    if new_parent == id || is_ancestor(kb, id, new_parent)? {
         return Err(CoreError::CycleDetected);
     }
 
-    if let Some(old_parent) = snapshot.parent_edge_target(id) {
-        append_edge_version(
-            history,
+    if let Some(old_parent) = kb.parent_edge_target(id) {
+        kb.append_edge_version(
             id,
             old_parent,
             EdgeType::Parent,
@@ -65,8 +55,7 @@ pub fn move_block(
         );
     }
 
-    append_edge_version(
-        history,
+    kb.append_edge_version(
         id,
         new_parent,
         EdgeType::Parent,
@@ -76,24 +65,19 @@ pub fn move_block(
     Ok(())
 }
 
-pub fn delete_block(
-    history: &mut VersionHistory,
-    snapshot: &Snapshot,
-    id: Uuid,
-) -> Result<(), CoreError> {
-    if snapshot.block(id).is_none() {
+pub fn delete_block(kb: &mut KnowledgeBase, id: Uuid) -> Result<(), CoreError> {
+    if kb.block(id).is_none() {
         return Err(GraphError::BlockNotFound(id).into());
     }
-    if snapshot.is_root(id) {
+    if kb.is_root(id) {
         return Err(CoreError::DeleteRootForbidden);
     }
-    if snapshot.has_children(id) {
+    if kb.has_children(id) {
         return Err(CoreError::DeleteWithChildren);
     }
 
-    if let Some(parent) = snapshot.parent_edge_target(id) {
-        append_edge_version(
-            history,
+    if let Some(parent) = kb.parent_edge_target(id) {
+        kb.append_edge_version(
             id,
             parent,
             EdgeType::Parent,
@@ -102,12 +86,12 @@ pub fn delete_block(
         );
     }
 
-    append_block_version(history, id, true, snapshot.block(id).unwrap().properties.clone());
+    kb.append_block_version(id, true, kb.block(id).unwrap().properties.clone());
     Ok(())
 }
 
-fn is_ancestor(snapshot: &Snapshot, ancestor: Uuid, mut current: Uuid) -> Result<bool, CoreError> {
-    while let Some(parent) = snapshot.parent_edge_target(current) {
+fn is_ancestor(kb: &KnowledgeBase, ancestor: Uuid, mut current: Uuid) -> Result<bool, CoreError> {
+    while let Some(parent) = kb.parent_edge_target(current) {
         if parent == ancestor {
             return Ok(true);
         }
@@ -119,113 +103,98 @@ fn is_ancestor(snapshot: &Snapshot, ancestor: Uuid, mut current: Uuid) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
-    use graph::{create_root_block_version, Snapshot};
+    use graph::KnowledgeBase;
 
-    fn test_state() -> (VersionHistory, Snapshot, Uuid) {
-        let mut history = VersionHistory::default();
+    fn test_state() -> (KnowledgeBase, Uuid) {
+        let mut kb = KnowledgeBase::empty();
         let root = Uuid::new_v4();
-        history.append_block(create_root_block_version(root));
-        let snapshot = Snapshot::materialize(&history);
-        (history, snapshot, root)
-    }
-
-    fn rematerialize(history: &VersionHistory) -> Snapshot {
-        Snapshot::materialize(history)
+        kb.append_root_block(root);
+        (kb, root)
     }
 
     #[test]
     fn create_requires_parent() {
-        let (mut history, snapshot, _) = test_state();
+        let (mut kb, _) = test_state();
         assert!(matches!(
-            create_block(&mut history, &snapshot, None).unwrap_err(),
+            create_block(&mut kb, None).unwrap_err(),
             CoreError::ParentRequired
         ));
     }
 
     #[test]
     fn create_child_under_root() {
-        let (mut history, snapshot, root) = test_state();
-        let child = create_block(&mut history, &snapshot, Some(root)).unwrap();
-        let snapshot = rematerialize(&history);
-        assert!(snapshot.block(child).is_some());
-        assert_eq!(snapshot.parent(child).unwrap().unwrap().id, root);
+        let (mut kb, root) = test_state();
+        let child = create_block(&mut kb, Some(root)).unwrap();
+        assert!(kb.block(child).is_some());
+        assert_eq!(kb.parent(child).unwrap().unwrap().id, root);
     }
 
     #[test]
     fn move_and_delete_leaf() {
-        let (mut history, snapshot, root) = test_state();
-        let child = create_block(&mut history, &snapshot, Some(root)).unwrap();
-        let mut snapshot = rematerialize(&history);
-        let sibling = create_block(&mut history, &snapshot, Some(root)).unwrap();
-        snapshot = rematerialize(&history);
+        let (mut kb, root) = test_state();
+        let child = create_block(&mut kb, Some(root)).unwrap();
+        let sibling = create_block(&mut kb, Some(root)).unwrap();
 
-        move_block(&mut history, &snapshot, child, Some(sibling)).unwrap();
-        snapshot = rematerialize(&history);
-        assert_eq!(snapshot.parent(child).unwrap().unwrap().id, sibling);
+        move_block(&mut kb, child, Some(sibling)).unwrap();
+        assert_eq!(kb.parent(child).unwrap().unwrap().id, sibling);
 
-        delete_block(&mut history, &snapshot, child).unwrap();
-        snapshot = rematerialize(&history);
-        assert!(snapshot.block(child).is_none());
+        delete_block(&mut kb, child).unwrap();
+        assert!(kb.block(child).is_none());
     }
 
     #[test]
     fn move_to_root_and_cycle_are_rejected() {
-        let (mut history, snapshot, root) = test_state();
-        let child = create_block(&mut history, &snapshot, Some(root)).unwrap();
-        let mut snapshot = rematerialize(&history);
-        let grandchild = create_block(&mut history, &snapshot, Some(child)).unwrap();
-        snapshot = rematerialize(&history);
+        let (mut kb, root) = test_state();
+        let child = create_block(&mut kb, Some(root)).unwrap();
+        let grandchild = create_block(&mut kb, Some(child)).unwrap();
 
         assert!(matches!(
-            move_block(&mut history, &snapshot, child, None).unwrap_err(),
+            move_block(&mut kb, child, None).unwrap_err(),
             CoreError::ParentRequired
         ));
         assert!(matches!(
-            move_block(&mut history, &snapshot, child, Some(grandchild)).unwrap_err(),
+            move_block(&mut kb, child, Some(grandchild)).unwrap_err(),
             CoreError::CycleDetected
         ));
     }
 
     #[test]
     fn delete_root_and_parent_with_children_are_rejected() {
-        let (mut history, snapshot, root) = test_state();
-        let child = create_block(&mut history, &snapshot, Some(root)).unwrap();
-        let mut snapshot = rematerialize(&history);
-        let _grandchild = create_block(&mut history, &snapshot, Some(child)).unwrap();
-        snapshot = rematerialize(&history);
+        let (mut kb, root) = test_state();
+        let child = create_block(&mut kb, Some(root)).unwrap();
+        let _grandchild = create_block(&mut kb, Some(child)).unwrap();
 
         assert!(matches!(
-            delete_block(&mut history, &snapshot, root).unwrap_err(),
+            delete_block(&mut kb, root).unwrap_err(),
             CoreError::DeleteRootForbidden
         ));
         assert!(matches!(
-            delete_block(&mut history, &snapshot, child).unwrap_err(),
+            delete_block(&mut kb, child).unwrap_err(),
             CoreError::DeleteWithChildren
         ));
     }
 
     #[test]
     fn failed_mutations_append_nothing() {
-        let (mut history, snapshot, root) = test_state();
-        let before_blocks = history.block_versions.len();
-        let before_edges = history.edge_versions.len();
+        let (mut kb, root) = test_state();
+        let before_blocks = kb.block_version_records().len();
+        let before_edges = kb.edge_version_records().len();
 
         assert!(matches!(
-            create_block(&mut history, &snapshot, None).unwrap_err(),
+            create_block(&mut kb, None).unwrap_err(),
             CoreError::ParentRequired
         ));
-        assert_eq!(history.block_versions.len(), before_blocks);
-        assert_eq!(history.edge_versions.len(), before_edges);
+        assert_eq!(kb.block_version_records().len(), before_blocks);
+        assert_eq!(kb.edge_version_records().len(), before_edges);
 
-        let child = create_block(&mut history, &snapshot, Some(root)).unwrap();
-        let snapshot = rematerialize(&history);
-        let before_blocks = history.block_versions.len();
+        let child = create_block(&mut kb, Some(root)).unwrap();
+        let before_blocks = kb.block_version_records().len();
 
         assert!(matches!(
-            delete_block(&mut history, &snapshot, root).unwrap_err(),
+            delete_block(&mut kb, root).unwrap_err(),
             CoreError::DeleteRootForbidden
         ));
-        assert_eq!(history.block_versions.len(), before_blocks);
-        assert!(snapshot.block(child).is_some());
+        assert_eq!(kb.block_version_records().len(), before_blocks);
+        assert!(kb.block(child).is_some());
     }
 }

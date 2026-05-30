@@ -18,9 +18,15 @@ cargo run -q -p pu-erh -- --file "$FILE" create --parent "$ROOT"
 cargo run -q -p pu-erh -- --file "$FILE" query "children:$ROOT"
 ```
 
+## Architecture
+
+In memory, a knowledge base is a single **trie-backed store** (`KnowledgeBase`): two radix tries holding all block and edge version records. Mutations insert new records directly into the tries. Active blocks and edges are resolved at read time via CRDT winner selection (highest version, digest tie-break), excluding tombstones.
+
+There is no separate in-memory append log or rematerialization step.
+
 ## Storage format (v1)
 
-Knowledge bases are stored as JSON with append-only version records:
+On disk, version records are stored as JSON arrays — a persistence envelope, not the in-memory structure:
 
 ```json
 {
@@ -30,8 +36,8 @@ Knowledge bases are stored as JSON with append-only version records:
 }
 ```
 
-Each mutation appends new `BlockVersion` or `EdgeVersion` records with BLAKE3 content digests. Reads materialize a snapshot by selecting the winning version per entity (highest version, digest tie-break) and excluding tombstones.
+Load inserts each record into the trie; save exports trie contents (sorted by full CRDT key). Each mutation appends new `BlockVersion` or `EdgeVersion` records with BLAKE3 content digests.
 
 This replaces the earlier walking-skeleton snapshot format (`{ "blocks", "edges" }`). There is no migration path — create a new knowledge base file.
 
-Replication merges histories by union with digest deduplication; conflict resolution happens at read-time materialization.
+Replication merges knowledge bases by trie union (identical records share the same full key); conflict resolution happens at read-time winner selection.

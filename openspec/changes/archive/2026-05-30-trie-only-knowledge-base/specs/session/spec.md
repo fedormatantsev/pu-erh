@@ -1,8 +1,5 @@
-# session Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change walking-skeleton. Update Purpose after archive.
-## Requirements
 ### Requirement: Session owns graph
 
 A user session MUST hold one trie-backed knowledge base for one storage file and be the sole entry point for reads and writes during that session.
@@ -37,6 +34,22 @@ The session MUST track whether the knowledge base has been modified and support 
 
 - **WHEN** a session is opened from an existing storage file, only read queries are executed, and no mutations occur
 - **THEN** the storage file on disk is unchanged
+
+## REMOVED Requirements
+
+### Requirement: Session owns version history
+
+**Reason:** Replaced by a single trie-backed knowledge base; the in-memory vector log is removed.
+
+**Migration:** Sessions expose the knowledge base (or snapshot alias) instead of separate version history and materialized snapshot.
+
+### Requirement: Incremental snapshot update on mutation
+
+**Reason:** Mutations insert directly into version tries; rematerialization from a vector log is no longer used.
+
+**Migration:** After mutation, new records are already in the trie; no rematerialize step.
+
+## ADDED Requirements
 
 ### Requirement: Direct trie update on mutation
 
