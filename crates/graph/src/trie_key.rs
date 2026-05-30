@@ -26,27 +26,6 @@ impl CrdtKeySuffix {
         out[40..72].copy_from_slice(previous_digest.unwrap_or(&ZERO_DIGEST));
     }
 
-    pub fn read_version(bytes: &[u8]) -> u64 {
-        let mut buf = [0u8; 8];
-        buf.copy_from_slice(&bytes[..8]);
-        u64::from_be_bytes(buf)
-    }
-
-    pub fn read_digest(bytes: &[u8]) -> Digest {
-        let mut digest = [0u8; 32];
-        digest.copy_from_slice(&bytes[8..40]);
-        digest
-    }
-
-    pub fn read_previous_digest(bytes: &[u8]) -> Option<Digest> {
-        let mut digest = [0u8; 32];
-        digest.copy_from_slice(&bytes[40..72]);
-        if digest == ZERO_DIGEST {
-            None
-        } else {
-            Some(digest)
-        }
-    }
 }
 
 pub fn block_entity_prefix(id: Uuid) -> [u8; BLOCK_ENTITY_PREFIX_LEN] {
@@ -129,6 +108,16 @@ pub fn edge_version_key_from(version: &crate::version::EdgeVersion) -> [u8; EDGE
 mod tests {
     use super::*;
 
+    fn read_previous_digest(bytes: &[u8]) -> Option<Digest> {
+        let mut digest = [0u8; 32];
+        digest.copy_from_slice(&bytes[40..72]);
+        if digest == ZERO_DIGEST {
+            None
+        } else {
+            Some(digest)
+        }
+    }
+
     #[test]
     fn key_lengths_and_version_ordering() {
         let id = Uuid::new_v4();
@@ -149,13 +138,10 @@ mod tests {
     fn previous_digest_zero_sentinel() {
         let mut suffix = [0u8; CRDT_SUFFIX_LEN];
         CrdtKeySuffix::write_into(&mut suffix, 1, &[9u8; 32], None);
-        assert_eq!(CrdtKeySuffix::read_previous_digest(&suffix), None);
+        assert_eq!(read_previous_digest(&suffix), None);
 
         let prev = [7u8; 32];
         CrdtKeySuffix::write_into(&mut suffix, 1, &[9u8; 32], Some(&prev));
-        assert_eq!(
-            CrdtKeySuffix::read_previous_digest(&suffix),
-            Some(prev)
-        );
+        assert_eq!(read_previous_digest(&suffix), Some(prev));
     }
 }

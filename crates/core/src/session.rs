@@ -30,10 +30,6 @@ impl Session {
         &self.kb
     }
 
-    pub fn snapshot(&self) -> &KnowledgeBase {
-        &self.kb
-    }
-
     pub fn root_id(&self) -> Result<Uuid, CoreError> {
         Ok(self.kb.root_id()?)
     }

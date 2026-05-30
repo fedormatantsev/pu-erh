@@ -31,11 +31,6 @@ impl Bitmask256 {
         self.0 == [0; 4]
     }
 
-    #[inline]
-    pub fn count(&self) -> usize {
-        self.0.iter().map(|word| word.count_ones() as usize).sum()
-    }
-
     /// Number of set bits strictly below `index`.
     #[inline]
     pub fn rank(&self, index: u8) -> usize {
@@ -86,7 +81,7 @@ mod tests {
         assert!(mask.test(0));
         assert!(mask.test(255));
         assert!(!mask.test(1));
-        assert_eq!(mask.count(), 2);
+        assert_eq!(mask.iter_set_bits().count(), 2);
         assert_eq!(mask.rank(0), 0);
         assert_eq!(mask.rank(255), 1);
         assert_eq!(mask.last_set(), Some(255));
