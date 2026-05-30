@@ -15,7 +15,13 @@ vendor/
 dist/
 build/
 out/
+target/
 *.log
+
+# Rust / Cargo
+**/*.rs.bk
+*.profraw
+*.profdata
 
 # Python
 __pycache__/
