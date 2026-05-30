@@ -1,8 +1,21 @@
-# session Specification
+## ADDED Requirements
 
-## Purpose
-TBD - created by archiving change walking-skeleton. Update Purpose after archive.
-## Requirements
+### Requirement: Session owns version history
+
+A user session MUST hold the append-only version history and a materialized snapshot for one knowledge base.
+
+#### Scenario: Session materializes on open
+
+- **WHEN** a session is opened with a storage file containing version records
+- **THEN** the session materializes a snapshot from that history
+
+#### Scenario: Session starts empty for new knowledge base
+
+- **WHEN** a session is opened and the storage file does not exist
+- **THEN** the session holds an empty version history
+
+## MODIFIED Requirements
+
 ### Requirement: Session owns graph
 
 A user session MUST hold the materialized snapshot for one knowledge base and be the sole entry point for reads and writes during that session.
@@ -37,18 +50,3 @@ The session MUST track whether version history has been modified and support sav
 
 - **WHEN** a session is opened from an existing storage file, only read queries are executed, and no mutations occur
 - **THEN** the storage file on disk is unchanged
-
-### Requirement: Session owns version history
-
-A user session MUST hold the append-only version history and a materialized snapshot for one knowledge base.
-
-#### Scenario: Session materializes on open
-
-- **WHEN** a session is opened with a storage file containing version records
-- **THEN** the session materializes a snapshot from that history
-
-#### Scenario: Session starts empty for new knowledge base
-
-- **WHEN** a session is opened and the storage file does not exist
-- **THEN** the session holds an empty version history
-

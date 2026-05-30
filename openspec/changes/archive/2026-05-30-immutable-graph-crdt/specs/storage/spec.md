@@ -1,8 +1,5 @@
-# storage Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change walking-skeleton. Update Purpose after archive.
-## Requirements
 ### Requirement: Serialize knowledge base to file
 
 The system MUST persist a knowledge base as a single versioned JSON file containing all block and edge version records (`format_version`, `block_versions`, `edge_versions`).
@@ -35,4 +32,3 @@ When loading from a path that exists but contains invalid JSON, an unsupported f
 
 - **WHEN** storage is loaded from a file with an unsupported `format_version`
 - **THEN** the system returns an error describing the version mismatch
-

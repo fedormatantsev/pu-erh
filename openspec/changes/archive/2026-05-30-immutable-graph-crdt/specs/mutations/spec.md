@@ -1,8 +1,27 @@
-# mutations Specification
+## ADDED Requirements
 
-## Purpose
-TBD - created by archiving change walking-skeleton. Update Purpose after archive.
-## Requirements
+### Requirement: Mutations append version records
+
+Successful mutations MUST append new block and/or edge version records to history and rematerialize the snapshot. Failed mutations MUST NOT append records.
+
+#### Scenario: Successful create appends records
+
+- **WHEN** a block is successfully created
+- **THEN** a new block version record and a new parent edge version record are appended
+
+#### Scenario: Successful delete appends tombstone
+
+- **WHEN** a leaf block is successfully deleted
+- **THEN** a new tombstoned block version record is appended
+
+#### Scenario: Failed mutation appends nothing
+
+- **WHEN** a mutation fails validation
+- **THEN** no version records are appended
+- **AND** the snapshot is unchanged
+
+## MODIFIED Requirements
+
 ### Requirement: Create block
 
 The system MUST support creating a new block with a required parent by appending block and edge version records. Creating a block without a parent MUST be rejected.
@@ -71,24 +90,3 @@ The system MUST support deleting a block by appending a tombstoned block version
 
 - **WHEN** delete is applied to an id not present in the snapshot
 - **THEN** the system returns an error
-
-### Requirement: Mutations append version records
-
-Successful mutations MUST append new block and/or edge version records to history and rematerialize the snapshot. Failed mutations MUST NOT append records.
-
-#### Scenario: Successful create appends records
-
-- **WHEN** a block is successfully created
-- **THEN** a new block version record and a new parent edge version record are appended
-
-#### Scenario: Successful delete appends tombstone
-
-- **WHEN** a leaf block is successfully deleted
-- **THEN** a new tombstoned block version record is appended
-
-#### Scenario: Failed mutation appends nothing
-
-- **WHEN** a mutation fails validation
-- **THEN** no version records are appended
-- **AND** the snapshot is unchanged
-

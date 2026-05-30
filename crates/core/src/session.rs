@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use graph::{Block, Graph};
+use graph::{
+    create_root_block_version, Block, Snapshot, VersionHistory,
+};
 use storage::{load, save};
 use uuid::Uuid;
 
@@ -9,7 +11,8 @@ use crate::mutation;
 use crate::query;
 
 pub struct Session {
-    graph: Graph,
+    history: VersionHistory,
+    snapshot: Snapshot,
     path: PathBuf,
     dirty: bool,
 }
@@ -18,49 +21,74 @@ impl Session {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, CoreError> {
         let path = path.as_ref().to_path_buf();
         let existed = path.exists();
-        let graph = load(&path)?;
+        let history = load(&path)?;
+        let snapshot = history.materialize();
         Ok(Self {
-            graph,
+            history,
+            snapshot,
             path,
             dirty: !existed,
         })
     }
 
-    pub fn graph(&self) -> &Graph {
-        &self.graph
+    pub fn snapshot(&self) -> &Snapshot {
+        &self.snapshot
     }
 
-    pub fn root_id(&self) -> Uuid {
-        self.graph.root_id()
+    pub fn history(&self) -> &VersionHistory {
+        &self.history
+    }
+
+    pub fn root_id(&self) -> Result<Uuid, CoreError> {
+        Ok(self.snapshot.root_id()?)
     }
 
     pub fn save(&mut self) -> Result<(), CoreError> {
         if self.dirty {
-            save(&self.path, &self.graph)?;
+            self.ensure_root()?;
+            save(&self.path, &self.history)?;
             self.dirty = false;
         }
         Ok(())
     }
 
     pub fn query(&self, expression: &str) -> Result<Vec<Block>, CoreError> {
-        query::execute(&self.graph, expression)
+        query::execute(&self.snapshot, expression)
     }
 
     pub fn create_block(&mut self, parent: Option<Uuid>) -> Result<Uuid, CoreError> {
-        let id = mutation::create_block(&mut self.graph, parent)?;
+        let id = mutation::create_block(&mut self.history, &self.snapshot, parent)?;
+        self.rematerialize()?;
         self.dirty = true;
         Ok(id)
     }
 
     pub fn move_block(&mut self, id: Uuid, new_parent: Option<Uuid>) -> Result<(), CoreError> {
-        mutation::move_block(&mut self.graph, id, new_parent)?;
+        mutation::move_block(&mut self.history, &self.snapshot, id, new_parent)?;
+        self.rematerialize()?;
         self.dirty = true;
         Ok(())
     }
 
     pub fn delete_block(&mut self, id: Uuid) -> Result<(), CoreError> {
-        mutation::delete_block(&mut self.graph, id)?;
+        mutation::delete_block(&mut self.history, &self.snapshot, id)?;
+        self.rematerialize()?;
         self.dirty = true;
+        Ok(())
+    }
+
+    fn ensure_root(&mut self) -> Result<Uuid, CoreError> {
+        if self.history.block_versions.is_empty() {
+            let root_id = Uuid::new_v4();
+            self.history
+                .append_block(create_root_block_version(root_id));
+            self.rematerialize()?;
+        }
+        Ok(self.snapshot.root_id()?)
+    }
+
+    fn rematerialize(&mut self) -> Result<(), CoreError> {
+        self.snapshot = self.history.materialize();
         Ok(())
     }
 }
@@ -71,18 +99,19 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn open_new_knowledge_base_initializes_root_and_persists_on_save() {
+    fn open_new_knowledge_base_initializes_root_on_save() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("kb.json");
 
         let mut session = Session::open(&path).unwrap();
-        let root = session.root_id();
+        session.save().unwrap();
+        let root = session.root_id().unwrap();
         let child = session.create_block(Some(root)).unwrap();
         session.save().unwrap();
 
         let session = Session::open(&path).unwrap();
-        assert_eq!(session.root_id(), root);
-        assert!(session.graph().block(child).is_some());
+        assert_eq!(session.root_id().unwrap(), root);
+        assert!(session.snapshot().block(child).is_some());
     }
 
     #[test]
@@ -92,16 +121,17 @@ mod tests {
 
         let mut session = Session::open(&path).unwrap();
         session.save().unwrap();
+        let root = session.root_id().unwrap();
 
         let session = Session::open(&path).unwrap();
-        let _ = session.query(&format!("children:{}", session.root_id())).unwrap();
+        let _ = session.query(&format!("children:{root}")).unwrap();
         drop(session);
 
         let metadata = std::fs::metadata(&path).unwrap();
         let first_modified = metadata.modified().unwrap();
         std::thread::sleep(std::time::Duration::from_millis(10));
         let session = Session::open(&path).unwrap();
-        let _ = session.query(&format!("children:{}", session.root_id())).unwrap();
+        let _ = session.query(&format!("children:{root}")).unwrap();
         drop(session);
         let metadata = std::fs::metadata(&path).unwrap();
         assert_eq!(metadata.modified().unwrap(), first_modified);

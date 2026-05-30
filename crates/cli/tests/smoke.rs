@@ -10,8 +10,8 @@ fn cli_smoke_test() {
     let file_arg = file.to_string_lossy().into_owned();
 
     let mut session = Session::open(&file).unwrap();
-    let root = session.root_id();
     session.save().unwrap();
+    let root = session.root_id().unwrap();
 
     let output = Command::new(env!("CARGO_BIN_EXE_pu-erh"))
         .args(["--file", &file_arg, "create", "--parent", &root.to_string()])
