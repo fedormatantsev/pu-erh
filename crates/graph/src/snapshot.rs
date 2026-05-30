@@ -1,15 +1,52 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use uuid::Uuid;
 
-use crate::model::{Block, Edge, EdgeKey, GraphError, PARENT_EDGE_TYPE};
+use crate::model::{Block, Edge, GraphError, PARENT_EDGE_TYPE};
+use crate::radix_trie::{DiffKind, RadixTrieMap, TrieDiffEntry};
+use crate::trie_key::{
+    block_entity_prefix, block_version_key_from, edge_entity_prefix, edge_nav_prefix,
+    edge_version_key_from, EdgeType, BLOCK_ENTITY_PREFIX_LEN, EDGE_ENTITY_PREFIX_LEN,
+};
 use crate::version::{BlockVersion, EdgeVersion, VersionHistory};
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Snapshot {
-    blocks: HashMap<Uuid, Block>,
-    edges: HashMap<EdgeKey, Edge>,
-    root_id: Option<Uuid>,
+    block_versions: RadixTrieMap<BlockVersion>,
+    edge_versions: RadixTrieMap<EdgeVersion>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SnapshotDiffEntity {
+    Block(Uuid),
+    Edge {
+        target: Uuid,
+        edge_type: EdgeType,
+        source: Uuid,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SnapshotDiffEntry {
+    pub entity: SnapshotDiffEntity,
+    pub kind: DiffKind,
+    pub old: Option<BlockOrEdge>,
+    pub new: Option<BlockOrEdge>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BlockOrEdge {
+    Block(Block),
+    Edge(Edge),
+}
+
+impl Default for Snapshot {
+    fn default() -> Self {
+        Self {
+            block_versions: RadixTrieMap::new(),
+            edge_versions: RadixTrieMap::new(),
+        }
+    }
 }
 
 impl Snapshot {
@@ -18,171 +55,187 @@ impl Snapshot {
     }
 
     pub fn materialize(history: &VersionHistory) -> Self {
-        let mut snapshot = Self::empty();
-        if history.block_versions.is_empty() && history.edge_versions.is_empty() {
-            return snapshot;
+        Self::materialize_from(None, history)
+    }
+
+    pub fn materialize_from(previous: Option<&Snapshot>, history: &VersionHistory) -> Self {
+        let mut block_versions = previous
+            .map(|snapshot| snapshot.block_versions.clone())
+            .unwrap_or_default();
+        let mut edge_versions = previous
+            .map(|snapshot| snapshot.edge_versions.clone())
+            .unwrap_or_default();
+
+        for version in &history.block_versions {
+            let key = block_version_key_from(version);
+            block_versions = block_versions.insert(&key, version.clone());
         }
 
-        let winning_blocks = select_winning_block_versions(&history.block_versions);
-        let winning_edges = select_winning_edge_versions(&history.edge_versions);
+        for version in &history.edge_versions {
+            if let Some(key) = edge_version_key_from(version) {
+                edge_versions = edge_versions.insert(&key, version.clone());
+            }
+        }
 
-        for version in winning_blocks.values() {
-            if version.tombstoned {
+        Self {
+            block_versions,
+            edge_versions,
+        }
+    }
+
+    fn active_block_version(&self, id: Uuid) -> Option<&BlockVersion> {
+        let prefix = block_entity_prefix(id);
+        let (_, version) = self.block_versions.winner_under_prefix(&prefix)?;
+        if version.tombstoned {
+            return None;
+        }
+        Some(version)
+    }
+
+    fn active_block(&self, id: Uuid) -> Option<Block> {
+        self.active_block_version(id).map(|version| Block {
+            id: version.id,
+            properties: version.properties.clone(),
+        })
+    }
+
+    fn active_edge(&self, target: Uuid, edge_type: EdgeType, source: Uuid) -> Option<Edge> {
+        let entity = edge_entity_prefix(target, edge_type, source);
+        let (_, version) = self.edge_versions.winner_under_prefix(&entity)?;
+        if version.tombstoned {
+            return None;
+        }
+        if self.active_block(source).is_none() || self.active_block(target).is_none() {
+            return None;
+        }
+        Some(edge_from_version(version))
+    }
+
+    fn distinct_block_ids(&self) -> Vec<Uuid> {
+        let mut seen = HashSet::new();
+        let mut ids = Vec::new();
+        for (key, _) in self.block_versions.iter() {
+            if key.len() < BLOCK_ENTITY_PREFIX_LEN {
                 continue;
             }
-            snapshot.blocks.insert(
-                version.id,
-                Block {
-                    id: version.id,
-                    properties: version.properties.clone(),
-                },
-            );
+            let id = Uuid::from_bytes(key[..BLOCK_ENTITY_PREFIX_LEN].try_into().expect("uuid"));
+            if seen.insert(id) {
+                ids.push(id);
+            }
         }
+        ids
+    }
 
-        for version in winning_edges.values() {
-            if version.tombstoned {
+    fn distinct_edge_entities(&self) -> Vec<[u8; EDGE_ENTITY_PREFIX_LEN]> {
+        let mut seen = HashSet::new();
+        let mut entities = Vec::new();
+        for (key, _) in self.edge_versions.iter() {
+            if key.len() < EDGE_ENTITY_PREFIX_LEN {
                 continue;
             }
-            let key = EdgeKey::new(version.target, &version.edge_type, version.source);
-            snapshot.edges.insert(
-                key,
-                Edge {
-                    source: version.source,
-                    target: version.target,
-                    edge_type: version.edge_type.clone(),
-                    properties: version.properties.clone(),
-                },
-            );
-        }
-
-        snapshot.filter_invariants();
-        snapshot
-    }
-
-    fn filter_invariants(&mut self) {
-        self.drop_edges_with_missing_endpoints();
-        self.drop_conflicting_parent_edges();
-        self.drop_cycle_edges();
-        self.recompute_root();
-    }
-
-    fn drop_edges_with_missing_endpoints(&mut self) {
-        self.edges.retain(|_, edge| {
-            self.blocks.contains_key(&edge.source) && self.blocks.contains_key(&edge.target)
-        });
-    }
-
-    fn drop_conflicting_parent_edges(&mut self) {
-        let mut parent_counts: HashMap<Uuid, usize> = HashMap::new();
-        for edge in self.edges.values() {
-            if edge.edge_type == PARENT_EDGE_TYPE {
-                *parent_counts.entry(edge.source).or_default() += 1;
+            let mut entity = [0u8; EDGE_ENTITY_PREFIX_LEN];
+            entity.copy_from_slice(&key[..EDGE_ENTITY_PREFIX_LEN]);
+            if seen.insert(entity) {
+                entities.push(entity);
             }
         }
-
-        let invalid_children: HashSet<Uuid> = parent_counts
-            .into_iter()
-            .filter(|(_, count)| *count != 1)
-            .map(|(child, _)| child)
-            .collect();
-
-        if invalid_children.is_empty() {
-            return;
-        }
-
-        self.edges.retain(|_, edge| {
-            !(edge.edge_type == PARENT_EDGE_TYPE && invalid_children.contains(&edge.source))
-        });
+        entities
     }
 
-    fn drop_cycle_edges(&mut self) {
-        loop {
-            let cycle_nodes = find_cycle_nodes(&self.edges);
-            if cycle_nodes.is_empty() {
-                break;
-            }
-            self.edges.retain(|_, edge| {
-                !(edge.edge_type == PARENT_EDGE_TYPE
-                    && (cycle_nodes.contains(&edge.source) || cycle_nodes.contains(&edge.target)))
-            });
-        }
-    }
-
-    fn recompute_root(&mut self) {
-        let blocks_with_parent: HashSet<Uuid> = self
-            .edges
-            .values()
-            .filter(|edge| edge.edge_type == PARENT_EDGE_TYPE)
-            .map(|edge| edge.source)
-            .collect();
-
-        let roots: Vec<Uuid> = self
-            .blocks
-            .keys()
-            .copied()
-            .filter(|id| !blocks_with_parent.contains(id))
-            .collect();
-
-        self.root_id = match roots.len() {
-            1 => Some(roots[0]),
-            _ => None,
-        };
-
-        if self.root_id.is_none() {
-            self.blocks.clear();
-            self.edges.clear();
-        }
+    fn active_edge_from_entity(&self, entity: [u8; EDGE_ENTITY_PREFIX_LEN]) -> Option<Edge> {
+        let edge_type = edge_type_from_entity_byte(entity[16])?;
+        let target = Uuid::from_bytes(entity[..16].try_into().ok()?);
+        let source = Uuid::from_bytes(entity[17..33].try_into().ok()?);
+        self.active_edge(target, edge_type, source)
     }
 
     pub fn root_id(&self) -> Result<Uuid, GraphError> {
-        self.root_id
-            .ok_or_else(|| GraphError::InvalidGraph("no valid root block".into()))
+        let mut roots = Vec::new();
+        for id in self.distinct_block_ids() {
+            if self.active_block(id).is_none() {
+                continue;
+            }
+            if self.parent_of(id).is_none() {
+                roots.push(id);
+            }
+        }
+        match roots.len() {
+            1 => Ok(roots[0]),
+            _ => Err(GraphError::InvalidGraph("no valid root block".into())),
+        }
     }
 
-    pub fn block(&self, id: Uuid) -> Option<&Block> {
-        self.blocks.get(&id)
+    pub fn block(&self, id: Uuid) -> Option<Block> {
+        self.active_block(id)
     }
 
-    pub fn get_block(&self, id: Uuid) -> Option<&Block> {
+    pub fn get_block(&self, id: Uuid) -> Option<Block> {
         self.block(id)
     }
 
-    pub fn get_edge(&self, source: Uuid, target: Uuid, edge_type: &str) -> Option<&Edge> {
-        let key = EdgeKey::new(target, edge_type, source);
-        self.edges.get(&key)
+    pub fn get_edge(&self, source: Uuid, target: Uuid, edge_type: &str) -> Option<Edge> {
+        let edge_type = EdgeType::try_from(edge_type).ok()?;
+        self.active_edge(target, edge_type, source)
     }
 
     pub fn parent_of(&self, child: Uuid) -> Option<Uuid> {
-        self.edges
-            .values()
-            .find(|edge| edge.edge_type == PARENT_EDGE_TYPE && edge.source == child)
-            .map(|edge| edge.target)
+        for entity in self.distinct_edge_entities() {
+            if entity[16] != EdgeType::Parent as u8 {
+                continue;
+            }
+            let source = Uuid::from_bytes(entity[17..33].try_into().ok()?);
+            if source != child {
+                continue;
+            }
+            let target = Uuid::from_bytes(entity[..16].try_into().ok()?);
+            if self
+                .active_edge(target, EdgeType::Parent, source)
+                .is_some()
+            {
+                return Some(target);
+            }
+        }
+        None
     }
 
     pub fn parent(&self, id: Uuid) -> Result<Option<Block>, GraphError> {
-        if self.block(id).is_none() {
+        if self.active_block(id).is_none() {
             return Err(GraphError::BlockNotFound(id));
         }
-        Ok(self.parent_of(id).and_then(|parent_id| self.block(parent_id).cloned()))
+        Ok(self.parent_of(id).and_then(|parent_id| self.active_block(parent_id)))
     }
 
     pub fn children(&self, id: Uuid) -> Result<Vec<Block>, GraphError> {
-        if self.block(id).is_none() {
+        if self.active_block(id).is_none() {
             return Err(GraphError::BlockNotFound(id));
         }
         Ok(self
             .children_of(id)
             .into_iter()
-            .filter_map(|child_id| self.block(child_id).cloned())
+            .filter_map(|child_id| self.active_block(child_id))
             .collect())
     }
 
     pub fn children_of(&self, parent: Uuid) -> Vec<Uuid> {
-        self.edges
-            .values()
-            .filter(|edge| edge.edge_type == PARENT_EDGE_TYPE && edge.target == parent)
-            .map(|edge| edge.source)
-            .collect()
+        let nav = edge_nav_prefix(parent, EdgeType::Parent);
+        let mut seen = HashSet::new();
+        let mut children = Vec::new();
+        for (key, _) in self.edge_versions.iter_prefix(&nav) {
+            if key.len() < EDGE_ENTITY_PREFIX_LEN {
+                continue;
+            }
+            let source = Uuid::from_bytes(key[17..33].try_into().expect("source"));
+            if !seen.insert(source) {
+                continue;
+            }
+            if self
+                .active_edge(parent, EdgeType::Parent, source)
+                .is_some()
+            {
+                children.push(source);
+            }
+        }
+        children
     }
 
     pub fn is_root(&self, id: Uuid) -> bool {
@@ -197,105 +250,130 @@ impl Snapshot {
         self.parent_of(child)
     }
 
-    pub fn blocks(&self) -> impl Iterator<Item = &Block> {
-        self.blocks.values()
+    pub fn blocks(&self) -> Vec<Block> {
+        self.distinct_block_ids()
+            .into_iter()
+            .filter_map(|id| self.active_block(id))
+            .collect()
     }
 
-    pub fn edges(&self) -> impl Iterator<Item = &Edge> {
-        self.edges.values()
+    pub fn edges(&self) -> Vec<Edge> {
+        self.distinct_edge_entities()
+            .into_iter()
+            .filter_map(|entity| self.active_edge_from_entity(entity))
+            .collect()
+    }
+
+    pub fn edges_with_prefix(&self, prefix: &[u8]) -> Vec<Edge> {
+        self.distinct_edge_entities()
+            .into_iter()
+            .filter(|entity| entity.starts_with(prefix))
+            .filter_map(|entity| self.active_edge_from_entity(entity))
+            .collect()
     }
 
     pub fn block_count(&self) -> usize {
-        self.blocks.len()
+        self.blocks().len()
     }
 
     pub fn edge_count(&self) -> usize {
-        self.edges.len()
-    }
-}
-
-fn select_winning_block_versions(versions: &[BlockVersion]) -> HashMap<Uuid, BlockVersion> {
-    let mut winners = HashMap::new();
-    for version in versions {
-        winners
-            .entry(version.id)
-            .and_modify(|current| {
-                if is_newer_version(version, current) {
-                    *current = version.clone();
-                }
-            })
-            .or_insert_with(|| version.clone());
-    }
-    winners
-}
-
-fn select_winning_edge_versions(versions: &[EdgeVersion]) -> HashMap<(Uuid, Uuid, String), EdgeVersion> {
-    let mut winners = HashMap::new();
-    for version in versions {
-        let key = (version.source, version.target, version.edge_type.clone());
-        winners
-            .entry(key)
-            .and_modify(|current| {
-                if is_newer_version(version, current) {
-                    *current = version.clone();
-                }
-            })
-            .or_insert_with(|| version.clone());
-    }
-    winners
-}
-
-fn is_newer_version<T: Versioned>(candidate: &T, current: &T) -> bool {
-    candidate.version() > current.version()
-        || (candidate.version() == current.version() && candidate.digest() > current.digest())
-}
-
-trait Versioned {
-    fn version(&self) -> u64;
-    fn digest(&self) -> &[u8; 32];
-}
-
-impl Versioned for BlockVersion {
-    fn version(&self) -> u64 {
-        self.version
+        self.edges().len()
     }
 
-    fn digest(&self) -> &[u8; 32] {
-        &self.digest
-    }
-}
-
-impl Versioned for EdgeVersion {
-    fn version(&self) -> u64 {
-        self.version
-    }
-
-    fn digest(&self) -> &[u8; 32] {
-        &self.digest
-    }
-}
-
-fn find_cycle_nodes(edges: &HashMap<EdgeKey, Edge>) -> HashSet<Uuid> {
-    let mut parent_of: HashMap<Uuid, Uuid> = HashMap::new();
-    for edge in edges.values() {
-        if edge.edge_type == PARENT_EDGE_TYPE {
-            parent_of.insert(edge.source, edge.target);
+    pub fn diff<'a>(&'a self, other: &'a Self) -> SnapshotDiff<'a> {
+        SnapshotDiff {
+            block_diff: self.block_versions.diff(&other.block_versions),
+            edge_diff: self.edge_versions.diff(&other.edge_versions),
+            left: self,
+            right: other,
+            block_done: false,
+            edge_done: false,
         }
     }
+}
 
-    let mut cycle_nodes = HashSet::new();
-    for start in parent_of.keys().copied() {
-        let mut seen = HashSet::new();
-        let mut current = Some(start);
-        while let Some(node) = current {
-            if !seen.insert(node) {
-                cycle_nodes.insert(node);
-                break;
+pub struct SnapshotDiff<'a> {
+    block_diff: crate::radix_trie::TrieDiff<'a, BlockVersion>,
+    edge_diff: crate::radix_trie::TrieDiff<'a, EdgeVersion>,
+    left: &'a Snapshot,
+    right: &'a Snapshot,
+    block_done: bool,
+    edge_done: bool,
+}
+
+impl<'a> Iterator for SnapshotDiff<'a> {
+    type Item = SnapshotDiffEntry;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if !self.block_done {
+            if let Some(entry) = self.block_diff.next() {
+                return Some(decode_block_diff(entry, self.left, self.right));
             }
-            current = parent_of.get(&node).copied();
+            self.block_done = true;
         }
+        if !self.edge_done {
+            if let Some(entry) = self.edge_diff.next() {
+                return Some(decode_edge_diff(entry, self.left, self.right));
+            }
+            self.edge_done = true;
+        }
+        None
     }
-    cycle_nodes
+}
+
+fn decode_block_diff(
+    entry: TrieDiffEntry<'_, BlockVersion>,
+    left: &Snapshot,
+    right: &Snapshot,
+) -> SnapshotDiffEntry {
+    let id = Uuid::from_bytes(entry.key[..16].try_into().expect("block id"));
+    SnapshotDiffEntry {
+        entity: SnapshotDiffEntity::Block(id),
+        kind: entry.kind,
+        old: entry.old.and_then(|_| left.block(id)).map(BlockOrEdge::Block),
+        new: entry.new.and_then(|_| right.block(id)).map(BlockOrEdge::Block),
+    }
+}
+
+fn decode_edge_diff(
+    entry: TrieDiffEntry<'_, EdgeVersion>,
+    left: &Snapshot,
+    right: &Snapshot,
+) -> SnapshotDiffEntry {
+    let target = Uuid::from_bytes(entry.key[..16].try_into().expect("target"));
+    let edge_type = EdgeType::Parent;
+    let source = Uuid::from_bytes(entry.key[17..33].try_into().expect("source"));
+    SnapshotDiffEntry {
+        entity: SnapshotDiffEntity::Edge {
+            target,
+            edge_type,
+            source,
+        },
+        kind: entry.kind,
+        old: left
+            .get_edge(source, target, PARENT_EDGE_TYPE)
+            .map(BlockOrEdge::Edge),
+        new: right
+            .get_edge(source, target, PARENT_EDGE_TYPE)
+            .map(BlockOrEdge::Edge),
+    }
+}
+
+fn edge_type_from_entity_byte(byte: u8) -> Option<EdgeType> {
+    if byte == EdgeType::Parent as u8 {
+        Some(EdgeType::Parent)
+    } else {
+        None
+    }
+}
+
+fn edge_from_version(version: &EdgeVersion) -> Edge {
+    Edge {
+        source: version.source,
+        target: version.target,
+        edge_type: version.edge_type.clone(),
+        properties: version.properties.clone(),
+    }
 }
 
 #[cfg(test)]
@@ -401,5 +479,39 @@ mod tests {
         let snapshot = Snapshot::materialize(&merged);
         assert_eq!(snapshot.block_count(), 2);
         assert_eq!(snapshot.parent_of(child), Some(root));
+    }
+
+    #[test]
+    fn identical_histories_share_trie_roots() {
+        let mut history = VersionHistory::default();
+        let root = Uuid::new_v4();
+        history.append_block(create_root_block_version(root));
+        let left = Snapshot::materialize(&history);
+        let right = left.clone();
+        assert_eq!(left.diff(&right).count(), 0);
+    }
+
+    #[test]
+    fn incremental_materialize_matches_full_rebuild() {
+        let mut history = VersionHistory::default();
+        let root = Uuid::new_v4();
+        history.append_block(create_root_block_version(root));
+        let partial = Snapshot::materialize(&history);
+        append_block_version(&mut history, Uuid::new_v4(), false, Properties::new());
+        let incremental = Snapshot::materialize_from(Some(&partial), &history);
+        let full = Snapshot::materialize(&history);
+        assert_eq!(incremental.block_count(), full.block_count());
+        assert_eq!(incremental.edge_count(), full.edge_count());
+    }
+
+    #[test]
+    fn per_call_reads_recompute_without_cache() {
+        let mut history = VersionHistory::default();
+        let root = Uuid::new_v4();
+        history.append_block(create_root_block_version(root));
+        let snapshot = Snapshot::materialize(&history);
+        assert_eq!(snapshot.root_id().unwrap(), root);
+        assert_eq!(snapshot.block_count(), 1);
+        assert_eq!(snapshot.block_count(), snapshot.blocks().len());
     }
 }

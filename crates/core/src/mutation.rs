@@ -6,6 +6,10 @@ use uuid::Uuid;
 
 use crate::error::CoreError;
 
+// Mutations validate graph invariants before appending versions; snapshot reads assume
+// the active view is already consistent and only apply cheap local checks (tombstone,
+// unknown edge type, missing endpoints on point lookups).
+
 pub fn create_block(
     history: &mut VersionHistory,
     snapshot: &Snapshot,

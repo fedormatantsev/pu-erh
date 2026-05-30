@@ -88,7 +88,8 @@ impl Session {
     }
 
     fn rematerialize(&mut self) -> Result<(), CoreError> {
-        self.snapshot = self.history.materialize();
+        let previous = self.snapshot.clone();
+        self.snapshot = Snapshot::materialize_from(Some(&previous), &self.history);
         Ok(())
     }
 }
