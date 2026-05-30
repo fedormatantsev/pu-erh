@@ -2,12 +2,18 @@ schema: spec-driven
 
 # Project context (optional)
 # This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Project: pu-erh — block-based graph knowledge base for focused attention
+  Metaphor: named after pu-erh tea (grounding, concentration)
+  Focus: block-based knowledge base with analytical query capabilities
+  Stack: Rust monorepo (crates: cli, core, graph, storage), DataFusion (internal, later), CLI-first
+  Architecture: CLI/App → Core (User Session) → Graph (in-memory logical model)
+                Core → Storage (on-disk physical model)
+                Core → Query (DataFusion over logical graph; later changes)
+  UX: custom read-only query language (e.g. parent:<uuid>, children:<uuid>)
+      plus separate mutation commands (create, move, delete)
+  Block IDs: UUID (v4 for v0)
+  Domain: blocks, sessions, knowledge bases, queries, mutations
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.
