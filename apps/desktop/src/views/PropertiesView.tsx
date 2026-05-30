@@ -1,14 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button, PropertiesPanel, Stack, Text } from "@pu-erh/ui";
 
 import { getBlock, save, setProperty } from "../ipc";
+import { BLOCK_VIEW_NAMES } from "./blockView";
 
-// Settings of the current Block View. Edits `display` of the current selected
-// block through the set_property mutation (held in memory), and persists via an
-// explicit Save control — no auto-save.
+// Properties whose values are rendered in dedicated layout slots above the
+// generic property list. These keys are excluded from the generic list.
+const LAYOUT_SLOT_PROPERTIES = new Set(["display"]);
+
+// Settings of the current Block View. The `display` property is rendered in its
+// own dedicated slot (a dropdown with no label) above the generic property list.
+// Absent or unrecognized `display` values resolve to "default" implicitly and
+// are written to storage on the next save.
 export function PropertiesView({ blockId }: { blockId: string }) {
-  const [display, setDisplay] = useState("");
+  const [display, setDisplay] = useState(BLOCK_VIEW_NAMES[0]);
+  const needsWrite = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -17,7 +24,12 @@ export function PropertiesView({ blockId }: { blockId: string }) {
       (block) => {
         if (cancelled) return;
         const value = block.properties.display;
-        setDisplay(typeof value === "string" ? value : "");
+        const resolved =
+          typeof value === "string" && BLOCK_VIEW_NAMES.includes(value)
+            ? value
+            : BLOCK_VIEW_NAMES[0];
+        needsWrite.current = resolved !== value;
+        setDisplay(resolved);
       },
       (err) => {
         if (!cancelled) setError(String(err));
@@ -28,28 +40,40 @@ export function PropertiesView({ blockId }: { blockId: string }) {
     };
   }, [blockId]);
 
-  const applyDisplay = () => {
+  const onDisplayChange = (value: string) => {
+    setDisplay(value);
+    needsWrite.current = false;
     setError(null);
-    setProperty(blockId, "display", display).catch((err) => setError(String(err)));
+    setProperty(blockId, "display", value).catch((err) => setError(String(err)));
   };
 
-  const persist = () => {
+  const persist = async () => {
     setError(null);
-    save().catch((err) => setError(String(err)));
+    try {
+      if (needsWrite.current) {
+        await setProperty(blockId, "display", display);
+        needsWrite.current = false;
+      }
+      await save();
+    } catch (err) {
+      setError(String(err));
+    }
   };
 
   return (
     <PropertiesPanel>
       <Text as="h1">Properties</Text>
-      <label className="pu-erh-properties-field">
-        <Text as="span">display</Text>
-        <input
-          value={display}
-          onChange={(event) => setDisplay(event.target.value)}
-        />
-      </label>
+      <select
+        value={display}
+        onChange={(e) => onDisplayChange(e.target.value)}
+      >
+        {BLOCK_VIEW_NAMES.map((name) => (
+          <option key={name} value={name}>
+            {name}
+          </option>
+        ))}
+      </select>
       <Stack gap="0.5rem">
-        <Button onClick={applyDisplay}>Apply display</Button>
         <Button onClick={persist}>Save</Button>
       </Stack>
       {error ? <Text>{error}</Text> : null}

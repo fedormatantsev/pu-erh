@@ -67,7 +67,11 @@ export function DefaultBlockView({ blockId }: { blockId: string }) {
   return <TreeBranch blockId={blockId} />;
 }
 
-const blockRenderers: Record<string, BlockView> = {};
+const blockRenderers: Record<string, BlockView> = {
+  tree: DefaultBlockView,
+};
+
+export const BLOCK_VIEW_NAMES: string[] = Object.keys(blockRenderers);
 
 export type BlockResolution = {
   View: BlockView;
