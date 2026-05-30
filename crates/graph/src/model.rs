@@ -71,23 +71,6 @@ pub struct Edge {
     pub properties: Properties,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct EdgeKey(String);
-
-impl EdgeKey {
-    pub fn new(target: Uuid, edge_type: EdgeType, source: Uuid) -> Self {
-        Self(format!("{target}{}{source}", edge_type as u8))
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    pub fn prefix_for(target: Uuid, edge_type: EdgeType) -> String {
-        format!("{target}{}", edge_type as u8)
-    }
-}
-
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum GraphError {
     #[error("block not found: {0}")]

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::digest::{hash_block_content, hash_edge_content, Digest};
+use crate::digest::{hash_block_content, hash_edge_content, Digest, DigestError};
 use crate::model::{EdgeType, Properties};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -27,16 +27,24 @@ impl BlockVersion {
         previous_digest: Option<Digest>,
         tombstoned: bool,
         properties: Properties,
-    ) -> Self {
-        let digest = hash_block_content(id, version, tombstoned, &properties);
-        Self {
+    ) -> Result<Self, DigestError> {
+        let digest = hash_block_content(id, version, tombstoned, &properties)?;
+        Ok(Self {
             id,
             version,
             digest,
             previous_digest,
             tombstoned,
             properties,
+        })
+    }
+
+    pub fn verify_digest(&self) -> Result<(), DigestError> {
+        let expected = hash_block_content(self.id, self.version, self.tombstoned, &self.properties)?;
+        if expected != self.digest {
+            return Err(DigestError::Mismatch);
         }
+        Ok(())
     }
 }
 
@@ -68,7 +76,7 @@ impl EdgeVersion {
         previous_digest: Option<Digest>,
         tombstoned: bool,
         properties: Properties,
-    ) -> Self {
+    ) -> Result<Self, DigestError> {
         let digest = hash_edge_content(
             source,
             target,
@@ -76,8 +84,8 @@ impl EdgeVersion {
             version,
             tombstoned,
             &properties,
-        );
-        Self {
+        )?;
+        Ok(Self {
             source,
             target,
             edge_type,
@@ -86,7 +94,22 @@ impl EdgeVersion {
             previous_digest,
             tombstoned,
             properties,
+        })
+    }
+
+    pub fn verify_digest(&self) -> Result<(), DigestError> {
+        let expected = hash_edge_content(
+            self.source,
+            self.target,
+            self.edge_type,
+            self.version,
+            self.tombstoned,
+            &self.properties,
+        )?;
+        if expected != self.digest {
+            return Err(DigestError::Mismatch);
         }
+        Ok(())
     }
 
     pub fn identity(&self) -> EdgeIdentity {
@@ -99,6 +122,7 @@ impl EdgeVersion {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// Logical edge identity. Trie/CRDT indexing uses `(target, edge_type, source)` byte order.
 pub struct EdgeIdentity {
     pub source: Uuid,
     pub target: Uuid,

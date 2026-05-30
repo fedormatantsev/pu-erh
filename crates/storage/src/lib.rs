@@ -40,6 +40,17 @@ pub fn load(path: &Path) -> Result<KnowledgeBase, StorageError> {
         )));
     }
 
+    for record in &file.block_versions {
+        record
+            .verify_digest()
+            .map_err(|err| StorageError::Invalid(format!("block version digest mismatch: {err}")))?;
+    }
+    for record in &file.edge_versions {
+        record
+            .verify_digest()
+            .map_err(|err| StorageError::Invalid(format!("edge version digest mismatch: {err}")))?;
+    }
+
     Ok(KnowledgeBase::from_records(
         file.block_versions,
         file.edge_versions,
@@ -152,5 +163,29 @@ mod tests {
         fs::write(&path, r#"{"blocks":[],"edges":[]}"#).unwrap();
         let err = load(&path).unwrap_err();
         assert!(matches!(err, StorageError::Invalid(_)));
+    }
+
+    #[test]
+    fn tampered_digest_is_rejected() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("kb.json");
+
+        let root = Uuid::new_v4();
+        let mut record = BlockVersion::new(root, 1, None, false, Properties::new()).unwrap();
+        record.digest = [0u8; 32];
+
+        let file = KnowledgeBaseFile {
+            format_version: FORMAT_VERSION,
+            block_versions: vec![record],
+            edge_versions: vec![],
+        };
+        let contents = serde_json::to_string_pretty(&file).unwrap();
+        fs::write(&path, contents).unwrap();
+
+        let err = load(&path).unwrap_err();
+        match err {
+            StorageError::Invalid(msg) => assert!(msg.contains("digest mismatch")),
+            other => panic!("expected invalid storage error, got {other:?}"),
+        }
     }
 }

@@ -1,17 +1,24 @@
 # block-model Specification
 
 ## Purpose
-TBD - created by archiving change walking-skeleton. Update Purpose after archive.
+
+Defines the logical block and edge model for pu-erh: UUID identity, property maps, parent-edge hierarchy, single root invariant, and how active entities are derived from version history at read time.
 ## Requirements
 ### Requirement: Block identity
 
-Each block in the knowledge base MUST have a unique identifier represented as a UUID v4.
+Each block in the knowledge base MUST have a unique identifier represented as a UUID. Newly created blocks MUST receive a newly generated UUID v4.
 
 #### Scenario: New block receives UUID
 
 - **WHEN** a block is created
 - **THEN** the system assigns a newly generated UUID v4 as its id
 - **AND** no two blocks in the same knowledge base share the same id
+
+#### Scenario: Persisted ids accepted on load
+
+- **WHEN** a block version record is loaded from storage
+- **THEN** its `id` is accepted regardless of UUID variant
+- **AND** only newly generated ids are required to be UUID v4
 
 ### Requirement: Block structure
 
@@ -48,7 +55,7 @@ Each edge MUST have a source id, a target id, an edge type represented as a `#[r
 
 ### Requirement: Edge key
 
-Active edges in the materialized snapshot MUST be indexed by composite key `{target_id}{type}{source_id}`. The active edge for each identity MUST come from the winning edge version record.
+Active edges in the materialized snapshot MUST be indexed by composite key `{target_id}{type}{source_id}` (33 raw bytes: 16-byte target UUID, 1-byte edge type, 16-byte source UUID). Edge identity for CRDT indexing matches this key order; see version-history for record field layout. The active edge for each identity MUST come from the winning edge version record.
 
 #### Scenario: Key determines uniqueness
 
@@ -85,18 +92,29 @@ Hierarchy MUST be represented by edges with type `EdgeType::Parent`, where the s
 
 #### Scenario: At most one parent per block
 
-- **WHEN** a block has a parent
+- **WHEN** a block has a parent in the active view after a single-writer mutation sequence
 - **THEN** exactly one `parent` edge exists with that block as source
+
+#### Scenario: Multiple parent edges after replication merge
+
+- **WHEN** replication merge produces multiple active `parent` edges with the same source and different targets
+- **THEN** the active view MAY contain more than one parent edge for that block
+- **AND** read-time repair of parent uniqueness is not performed
 
 ### Requirement: Single root block
 
 Each knowledge base MUST contain exactly one root block. The root block is the only block with no `parent` edge where it is the source.
 
-#### Scenario: New graph has root block
+#### Scenario: New graph has root block after first save
 
-- **WHEN** a new knowledge base is initialized
-- **THEN** exactly one root block exists with an empty properties map
+- **WHEN** a new knowledge base is first persisted (via `ensure_root` or first save on an empty knowledge base)
+- **THEN** exactly one root block exists in the active view with an empty properties map
 - **AND** no `parent` edge exists with the root block as source
+
+#### Scenario: New knowledge base is empty before first save
+
+- **WHEN** storage is loaded from a path that does not exist
+- **THEN** the in-memory knowledge base has no version records and no root block until first save
 
 #### Scenario: Root block is unique
 

@@ -17,6 +17,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    Init,
     Query {
         expression: String,
     },
@@ -46,6 +47,11 @@ fn run() -> Result<()> {
     let mut session = Session::open(&cli.file).context("failed to open knowledge base")?;
 
     match cli.command {
+        Commands::Init => {
+            session.save().context("failed to save knowledge base")?;
+            let root = session.root_id().context("failed to resolve root block")?;
+            println!("{root}");
+        }
         Commands::Query { expression } => {
             let blocks = session
                 .query(&expression)

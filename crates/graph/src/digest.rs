@@ -1,5 +1,6 @@
 use blake3::Hasher;
 use serde::{Deserialize, Deserializer, Serializer};
+use thiserror::Error;
 use uuid::Uuid;
 
 use crate::model::EdgeType;
@@ -7,18 +8,26 @@ use crate::Properties;
 
 pub type Digest = [u8; 32];
 
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum DigestError {
+    #[error("property value for key {0} is not JSON-serializable")]
+    PropertyNotSerializable(String),
+    #[error("digest mismatch")]
+    Mismatch,
+}
+
 pub fn hash_block_content(
     id: Uuid,
     version: u64,
     tombstoned: bool,
     properties: &Properties,
-) -> Digest {
+) -> Result<Digest, DigestError> {
     let mut hasher = Hasher::new();
     hasher.update(id.as_bytes());
     hasher.update(&version.to_le_bytes());
     hasher.update(&[u8::from(tombstoned)]);
-    hash_properties(&mut hasher, properties);
-    *hasher.finalize().as_bytes()
+    hash_properties(&mut hasher, properties)?;
+    Ok(*hasher.finalize().as_bytes())
 }
 
 pub fn hash_edge_content(
@@ -28,24 +37,26 @@ pub fn hash_edge_content(
     version: u64,
     tombstoned: bool,
     properties: &Properties,
-) -> Digest {
+) -> Result<Digest, DigestError> {
     let mut hasher = Hasher::new();
     hasher.update(source.as_bytes());
     hasher.update(target.as_bytes());
     hasher.update(&[edge_type as u8]);
     hasher.update(&version.to_le_bytes());
     hasher.update(&[u8::from(tombstoned)]);
-    hash_properties(&mut hasher, properties);
-    *hasher.finalize().as_bytes()
+    hash_properties(&mut hasher, properties)?;
+    Ok(*hasher.finalize().as_bytes())
 }
 
-fn hash_properties(hasher: &mut Hasher, properties: &Properties) {
+fn hash_properties(hasher: &mut Hasher, properties: &Properties) -> Result<(), DigestError> {
     for (key, value) in properties {
         hasher.update(key.as_bytes());
-        if let Ok(bytes) = serde_json::to_vec(value) {
-            hasher.update(&bytes);
-        }
+        let bytes = serde_json::to_vec(value).map_err(|_| {
+            DigestError::PropertyNotSerializable(key.clone())
+        })?;
+        hasher.update(&bytes);
     }
+    Ok(())
 }
 
 pub mod serde_hex {
@@ -109,8 +120,8 @@ mod tests {
     fn digest_is_stable() {
         let id = Uuid::new_v4();
         let props = Properties::new();
-        let first = hash_block_content(id, 1, false, &props);
-        let second = hash_block_content(id, 1, false, &props);
+        let first = hash_block_content(id, 1, false, &props).unwrap();
+        let second = hash_block_content(id, 1, false, &props).unwrap();
         assert_eq!(first, second);
     }
 
@@ -123,8 +134,8 @@ mod tests {
         let mut second = Properties::new();
         second.insert("a".into(), serde_json::json!(1));
         second.insert("b".into(), serde_json::json!(2));
-        let digest_first = hash_block_content(id, 1, false, &first);
-        let digest_second = hash_block_content(id, 1, false, &second);
+        let digest_first = hash_block_content(id, 1, false, &first).unwrap();
+        let digest_second = hash_block_content(id, 1, false, &second).unwrap();
         assert_eq!(digest_first, digest_second);
     }
 }

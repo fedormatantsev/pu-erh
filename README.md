@@ -13,7 +13,7 @@ Initialize a knowledge base and discover the auto-created root id:
 
 ```bash
 FILE=/tmp/kb.json
-ROOT=$(cargo run -q -p pu-erh-core --example show-root -- "$FILE")
+ROOT=$(cargo run -q -p pu-erh -- --file "$FILE" init)
 cargo run -q -p pu-erh -- --file "$FILE" create --parent "$ROOT"
 cargo run -q -p pu-erh -- --file "$FILE" query "children:$ROOT"
 ```

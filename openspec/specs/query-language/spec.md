@@ -1,7 +1,8 @@
 # query-language Specification
 
 ## Purpose
-TBD - created by archiving change walking-skeleton. Update Purpose after archive.
+
+Defines the v0 read-only query language for navigating the block hierarchy via `parent:` and `children:` expressions with UUID arguments.
 ## Requirements
 ### Requirement: Parent query
 
@@ -30,6 +31,11 @@ The query language MUST support `children:<uuid>` to return all direct child blo
 
 - **WHEN** query `children:<uuid>` is executed and the block has direct children
 - **THEN** the result contains all blocks that are the source of a `parent` edge whose target is `<uuid>`
+
+#### Scenario: Children result order unspecified
+
+- **WHEN** query `children:<uuid>` returns multiple blocks
+- **THEN** result order is unspecified
 
 #### Scenario: Block with no children
 

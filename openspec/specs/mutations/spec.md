@@ -1,7 +1,8 @@
 # mutations Specification
 
 ## Purpose
-TBD - created by archiving change walking-skeleton. Update Purpose after archive.
+
+Defines user-facing graph mutations (create, move, delete) as append-only version-record operations validated against the current active view before trie insertion.
 ## Requirements
 ### Requirement: Create block
 
@@ -16,7 +17,7 @@ The system MUST support creating a new block with a required parent by appending
 
 - **WHEN** a block is created with a parent id present in the snapshot
 - **THEN** block and parent edge version records are appended
-- **AND** after rematerialization a `parent` edge exists from the new block to the parent id
+- **AND** after append the active view has a `parent` edge from the new block to the parent id via per-call CRDT winner selection
 
 #### Scenario: Create with nonexistent parent
 
@@ -47,6 +48,12 @@ The system MUST support reparenting by appending new edge version records (tombs
 - **WHEN** move is applied to an id not present in the snapshot
 - **THEN** the system returns an error
 
+#### Scenario: Move block without existing parent edge
+
+- **WHEN** move is applied to a block with no active parent edge
+- **THEN** only a new parent edge version record is appended (no tombstone of a prior edge)
+- **AND** after append the active view has a `parent` edge for the block targeting the new parent
+
 ### Requirement: Delete block
 
 The system MUST support deleting a block by appending a tombstoned block version record. The root block MUST NOT be deletable.
@@ -55,7 +62,8 @@ The system MUST support deleting a block by appending a tombstoned block version
 
 - **WHEN** delete is applied to a block with no children
 - **THEN** a tombstoned block version record is appended
-- **AND** after rematerialization the block is absent
+- **AND** if an active parent edge exists, a tombstoned parent edge version record is appended
+- **AND** after append the block is absent from the active view via per-call CRDT winner selection
 
 #### Scenario: Delete block with children
 
@@ -74,7 +82,7 @@ The system MUST support deleting a block by appending a tombstoned block version
 
 ### Requirement: Mutations append version records
 
-Successful mutations MUST append new block and/or edge version records to history and rematerialize the snapshot. Failed mutations MUST NOT append records.
+Successful mutations MUST append new block and/or edge version records directly to the version tries. The active view reflects appended records via per-call CRDT winner selection without a full-history rematerialization pass. Failed mutations MUST NOT append records.
 
 #### Scenario: Successful create appends records
 

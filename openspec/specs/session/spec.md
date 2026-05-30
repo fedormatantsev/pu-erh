@@ -1,7 +1,8 @@
 # session Specification
 
 ## Purpose
-TBD - created by archiving change walking-skeleton. Update Purpose after archive.
+
+Defines the user session as the coordinator for one trie-backed knowledge base per storage file: load/save, dirty tracking, root initialization on first save, and direct trie updates on mutation.
 ## Requirements
 ### Requirement: Session owns graph
 
@@ -14,9 +15,15 @@ A user session MUST hold one trie-backed knowledge base for one storage file and
 
 #### Scenario: Session initializes root for new knowledge base
 
-- **WHEN** a session is opened for a new knowledge base and the first save occurs
-- **THEN** a root block version record is inserted into the knowledge base
-- **AND** the knowledge base contains exactly one root block
+- **WHEN** a session is opened for a new knowledge base (missing storage file) and the first save occurs
+- **THEN** a root block version record is inserted into the knowledge base via `ensure_root`
+- **AND** the knowledge base active view contains exactly one root block
+
+#### Scenario: New session has empty knowledge base before first save
+
+- **WHEN** a session is opened for a missing storage file
+- **THEN** the in-memory knowledge base has no version records until first save
+- **AND** `root_id()` fails until the root block version record is inserted
 
 ### Requirement: Session coordinates persistence
 
@@ -37,6 +44,11 @@ The session MUST track whether the knowledge base has been modified and support 
 
 - **WHEN** a session is opened from an existing storage file, only read queries are executed, and no mutations occur
 - **THEN** the storage file on disk is unchanged
+
+#### Scenario: Dirty flag on new file
+
+- **WHEN** a session is opened for a missing storage file
+- **THEN** the session is marked dirty so the first save persists the root block
 
 ### Requirement: Direct trie update on mutation
 

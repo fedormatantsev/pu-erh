@@ -8,7 +8,7 @@ use crate::trie_key::{
     block_entity_prefix, block_version_key_from, edge_entity_prefix, edge_nav_prefix,
     edge_version_key_from, BLOCK_ENTITY_PREFIX_LEN, EDGE_ENTITY_PREFIX_LEN,
 };
-use crate::version::{BlockVersion, EdgeIdentity, EdgeVersion};
+use crate::version::{BlockVersion, EdgeVersion};
 
 #[derive(Debug, Clone)]
 pub struct KnowledgeBase {
@@ -140,7 +140,8 @@ impl KnowledgeBase {
             .map(|winner| winner.version + 1)
             .unwrap_or(1);
         let previous_digest = self.crdt_winner_block(id).map(|winner| winner.digest);
-        let record = BlockVersion::new(id, version, previous_digest, tombstoned, properties);
+        let record = BlockVersion::new(id, version, previous_digest, tombstoned, properties)
+            .expect("block properties must be JSON-serializable");
         self.insert_block_record(record.clone());
         record
     }
@@ -168,7 +169,8 @@ impl KnowledgeBase {
             previous_digest,
             tombstoned,
             properties,
-        );
+        )
+        .expect("edge properties must be JSON-serializable");
         self.insert_edge_record(record.clone());
         record
     }
@@ -492,6 +494,9 @@ fn explicit_crdt_winner_block(kb: &KnowledgeBase, id: Uuid) -> Option<BlockVersi
 }
 
 #[cfg(test)]
+use crate::version::EdgeIdentity;
+
+#[cfg(test)]
 fn explicit_crdt_winner_edge(
     kb: &KnowledgeBase,
     identity: &EdgeIdentity,
@@ -514,6 +519,7 @@ fn explicit_crdt_winner_edge(
 mod tests {
     use super::*;
     use crate::model::EdgeType;
+    use crate::version::EdgeIdentity;
 
     #[test]
     fn append_picks_highest_version() {
@@ -548,8 +554,8 @@ mod tests {
     fn digest_tie_break_picks_lexicographically_larger() {
         let mut kb = KnowledgeBase::empty();
         let id = Uuid::new_v4();
-        let mut first = BlockVersion::new(id, 1, None, false, Properties::new());
-        let mut second = BlockVersion::new(id, 1, None, false, Properties::new());
+        let mut first = BlockVersion::new(id, 1, None, false, Properties::new()).unwrap();
+        let mut second = BlockVersion::new(id, 1, None, false, Properties::new()).unwrap();
         if first.digest > second.digest {
             std::mem::swap(&mut first.digest, &mut second.digest);
         }

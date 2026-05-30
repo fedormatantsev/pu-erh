@@ -6,8 +6,8 @@ mod snapshot;
 mod trie_key;
 mod version;
 
-pub use digest::Digest;
-pub use model::{Block, Edge, EdgeKey, EdgeType, GraphError, Properties};
+pub use digest::{Digest, DigestError};
+pub use model::{Block, Edge, EdgeType, GraphError, Properties};
 pub use radix_trie::{DiffKind, RadixTrieMap, TrieDiffEntry};
 pub use snapshot::{BlockOrEdge, KnowledgeBase, Snapshot, SnapshotDiffEntity, SnapshotDiffEntry};
 pub use trie_key::{

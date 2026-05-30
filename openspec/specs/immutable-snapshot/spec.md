@@ -1,7 +1,8 @@
 # immutable-snapshot Specification
 
 ## Purpose
-TBD - created by archiving change immutable-graph-crdt. Update Purpose after archive.
+
+Defines how active blocks and edges are derived at read time from radix-trie version stores via CRDT winner selection, tombstone exclusion, local invariant filtering, and per-call active reads without cached materialization.
 ## Requirements
 ### Requirement: Read-time materialization
 
@@ -41,9 +42,16 @@ Winning records marked `tombstoned` MUST be excluded from the active snapshot.
 - **WHEN** the winning block version for an id is tombstoned
 - **THEN** that block does not appear in the snapshot
 
+#### Scenario: Tombstoned winner with older live versions
+
+- **WHEN** the CRDT winner for a block or edge is tombstoned
+- **AND** older non-tombstone versions exist for the same entity
+- **THEN** the entity is still absent from the active view
+- **AND** no fallback to an older non-tombstone version is performed
+
 ### Requirement: Invariant filtering
 
-After selecting winners, read operations MUST apply only cheap, local invariant checks rather than global graph analysis. Successful mutation operations are assumed not to introduce invariant violations; read paths MUST NOT perform cycle detection or graph-wide exclusion passes.
+After selecting winners, read operations MUST apply only cheap, local invariant checks rather than global graph analysis. Successful mutation operations are assumed not to introduce invariant violations; read paths MUST NOT perform cycle detection or graph-wide exclusion passes. The single-writer mutation path maintains at most one active parent edge per block; after replication merge, multiple active parent edges for the same child MAY exist.
 
 #### Scenario: Invalid edge ignored on point read
 
@@ -56,14 +64,25 @@ After selecting winners, read operations MUST apply only cheap, local invariant 
 - **WHEN** active parent edges contain a cycle
 - **THEN** read operations do not run a global cycle detection pass to omit cycle participants
 
-### Requirement: Snapshot immutability
+#### Scenario: Multiple active parent edges after merge
 
-Materialized snapshots MUST NOT expose mutation methods.
+- **WHEN** replication merge produces multiple active `parent` edges with the same source and different targets
+- **THEN** `parent_of` returns one matching parent with unspecified choice order
+- **AND** no read-time repair is performed
 
-#### Scenario: Snapshot is read-only
+### Requirement: Active read API
 
-- **WHEN** code holds a snapshot reference
-- **THEN** it can read blocks and edges but cannot mutate snapshot state directly
+Consumer read methods (`block`, `parent`, `children`, `get_edge`, and related active-view lookups) MUST derive state per call from version tries without mutating trie contents. Version-record append methods (`append_block_version`, `append_edge_version`, `merge`, etc.) exist on `KnowledgeBase` for session, mutation, and storage paths and are not part of the active-read contract.
+
+#### Scenario: Active reads do not mutate tries
+
+- **WHEN** code calls active read methods on a knowledge base
+- **THEN** version trie contents are unchanged by those calls
+
+#### Scenario: Append methods insert version records
+
+- **WHEN** a mutation appends a version record through the session path
+- **THEN** the record is inserted into the appropriate version trie
 
 ### Requirement: Trie-backed version record storage
 
@@ -92,18 +111,18 @@ The snapshot MUST support retrieving active edges whose entity identity prefixes
 
 ### Requirement: Snapshot structural diff
 
-The snapshot MUST support comparing two materialized snapshots by iterating block and edge differences lazily, using pointer-identical subtree sharing where applicable.
+The snapshot MUST support comparing two knowledge bases by lazily iterating differences in their version-record tries, using pointer-identical subtree sharing where applicable. Diff entries project `old` and `new` values through the active read API (post-CRDT-winner active entity state), not raw version records.
 
 #### Scenario: Equal snapshots yield no diff entries
 
-- **WHEN** diff iteration is performed on two snapshots materialized from identical version history
+- **WHEN** diff iteration is performed on two knowledge bases with identical version-record trie structure
 - **THEN** no block or edge diff entries are yielded
 - **AND** block and edge trie roots are pointer-identical where maps are identical
 
-#### Scenario: Single block change localized diff
+#### Scenario: Single block property change yields active diff
 
-- **WHEN** diff iteration is performed on two snapshots that differ by one block's properties
-- **THEN** exactly one changed block entry is yielded among the divergent items
+- **WHEN** diff iteration is performed on two knowledge bases whose active views differ by one block's properties
+- **THEN** at least one diff entry includes that changed active block
 - **AND** unchanged subtrees remain shared between the two snapshot tries
 
 ### Requirement: Materialization equivalence
@@ -148,6 +167,12 @@ Each active read MUST recompute its result from version tries at call time witho
 
 - **WHEN** `children_of(parent)` is called
 - **THEN** the system scans the edge version trie by parent navigation prefix on that call and resolves per-child winners without a pre-built edge map
+
+#### Scenario: Parent lookup scans edge entities
+
+- **WHEN** `parent_of(child)` is called
+- **THEN** the system iterates distinct edge entity prefixes, filters to `Parent` type with matching source, and returns the target of the first active match
+- **AND** no prefix navigation index is required for parent lookup
 
 ### Requirement: Mutation-presumed invariant validity
 

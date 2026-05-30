@@ -1,7 +1,8 @@
 # radix-trie-map Specification
 
 ## Purpose
-TBD - created by archiving change radix-trie-map. Update Purpose after archive.
+
+Defines the persistent radix trie map used to store version records: inner/leaf structure, prefix iteration, copy-on-write sharing, CRDT key layout, and winner lookup by prefix descent.
 ## Requirements
 ### Requirement: Inner and leaf node structure
 
@@ -112,7 +113,12 @@ The radix trie map MUST support inserting a key (replacing any existing value fo
 
 ### Requirement: CRDT fields in trie keys
 
-Radix trie keys for graph version records MUST append CRDT metadata after the entity identity prefix: `version` as big-endian 8-byte integer, `digest` as 32 raw bytes, and `previous_digest` as 32 raw bytes (all zeros when absent).
+Radix trie keys for graph version records MUST append CRDT metadata after the entity identity prefix: `version` as big-endian 8-byte integer, `digest` as 32 raw bytes, and `previous_digest` as 32 raw bytes (all zeros when absent). The zero-byte sentinel for absent `previous_digest` applies to trie key encoding only; JSON persistence MUST represent absent `previous_digest` as `null` or omitted, not as a zero hex string.
+
+#### Scenario: Absent previous digest uses zero sentinel in key
+
+- **WHEN** a version record with no `previous_digest` is inserted into a trie
+- **THEN** the previous-digest portion of the CRDT key suffix is 32 zero bytes
 
 #### Scenario: Block key includes CRDT suffix
 
