@@ -15,7 +15,7 @@ Each block in the knowledge base MUST have a unique identifier represented as a 
 
 ### Requirement: Block structure
 
-Each block MUST contain an id and a properties map (generic key/value dictionary). Blocks MUST NOT have a type field or embed parent or other relation fields — relations are represented as edges.
+Each block MUST contain an id and a properties map (generic key/value dictionary with string keys and JSON-compatible values, stored in lexicographic key order). Blocks MUST NOT have a type field or embed parent or other relation fields — relations are represented as edges.
 
 #### Scenario: Block fields are accessible
 
@@ -29,7 +29,7 @@ Each block MUST contain an id and a properties map (generic key/value dictionary
 
 ### Requirement: Edge structure
 
-Each edge MUST have a source id, a target id, an edge type represented as a `#[repr(u8)]` enum, and a properties map (generic key/value dictionary).
+Each edge MUST have a source id, a target id, an edge type represented as a `#[repr(u8)]` enum, and a properties map (generic key/value dictionary with string keys and JSON-compatible values, stored in lexicographic key order).
 
 #### Scenario: Edge fields are accessible
 

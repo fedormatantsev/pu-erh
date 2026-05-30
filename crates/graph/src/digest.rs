@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use blake3::Hasher;
 use serde::{Deserialize, Deserializer, Serializer};
 use uuid::Uuid;
@@ -42,8 +40,7 @@ pub fn hash_edge_content(
 }
 
 fn hash_properties(hasher: &mut Hasher, properties: &Properties) {
-    let sorted: BTreeMap<_, _> = properties.iter().collect();
-    for (key, value) in sorted {
+    for (key, value) in properties {
         hasher.update(key.as_bytes());
         if let Ok(bytes) = serde_json::to_vec(value) {
             hasher.update(&bytes);
@@ -115,5 +112,19 @@ mod tests {
         let first = hash_block_content(id, 1, false, &props);
         let second = hash_block_content(id, 1, false, &props);
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn digest_is_independent_of_property_insertion_order() {
+        let id = Uuid::new_v4();
+        let mut first = Properties::new();
+        first.insert("b".into(), serde_json::json!(2));
+        first.insert("a".into(), serde_json::json!(1));
+        let mut second = Properties::new();
+        second.insert("a".into(), serde_json::json!(1));
+        second.insert("b".into(), serde_json::json!(2));
+        let digest_first = hash_block_content(id, 1, false, &first);
+        let digest_second = hash_block_content(id, 1, false, &second);
+        assert_eq!(digest_first, digest_second);
     }
 }

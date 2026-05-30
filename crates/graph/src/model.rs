@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::convert::TryFrom;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
 use uuid::Uuid;
 
-pub type Properties = HashMap<String, serde_json::Value>;
+pub type Properties = BTreeMap<String, serde_json::Value>;
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
