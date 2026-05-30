@@ -1,0 +1,26 @@
+mod commands;
+
+use commands::{ping, root_id};
+use desktop::AppState;
+use tauri::Manager;
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .setup(|app| {
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .expect("failed to resolve app data directory");
+            let kb_path = AppState::kb_path(&app_data_dir);
+            if let Some(parent) = kb_path.parent() {
+                std::fs::create_dir_all(parent).expect("failed to create app data directory");
+            }
+            let state = AppState::open_at(kb_path).expect("failed to open session");
+            app.manage(state);
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![ping, root_id])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}

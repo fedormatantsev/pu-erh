@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-root-id"
+description = "Enables the root_id command"
+commands.allow = ["root_id"]

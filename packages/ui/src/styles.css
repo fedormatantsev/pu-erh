@@ -1,0 +1,22 @@
+.pu-erh-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.pu-erh-text {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+}
+
+.pu-erh-button {
+  font: inherit;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid currentColor;
+  background: transparent;
+  cursor: pointer;
+}
+
+.pu-erh-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

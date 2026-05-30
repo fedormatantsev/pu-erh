@@ -20,6 +20,25 @@ cargo run -q -p pu-erh -- --file "$FILE" create --parent "$ROOT"
 cargo run -q -p pu-erh -- --file "$FILE" query "children:$ROOT"
 ```
 
+## Desktop shell
+
+Prerequisites: [Rust](https://rustup.rs/), [Bun](https://bun.sh/), and the [Tauri CLI](https://v2.tauri.app/start/prerequisites/) (`cargo install tauri-cli --locked` or `bun add -g @tauri-apps/cli`).
+
+```bash
+bun install
+bun run dev:desktop
+```
+
+Layout:
+
+| Path | Role |
+|------|------|
+| `crates/desktop` | Thin Rust adapter: owns `core::Session`, session path helper |
+| `packages/ui` | `@pu-erh/ui` design-system components (presentational only) |
+| `apps/desktop` | React app + Tauri shell (`src-tauri/`) |
+
+The desktop shell opens a session at `{app_data_dir}/pu-erh/kb.json`. It exposes scaffold IPC (`ping`, `root_id`) only; no auto-save or file-open UX.
+
 ## Architecture
 
 In memory, a knowledge base is a single **trie-backed store** (`KnowledgeBase`): two radix tries holding all block and edge version records. Mutations insert new records directly into the tries. Active blocks and edges are resolved at read time via CRDT winner selection (highest version, digest tie-break), excluding tombstones.

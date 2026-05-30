@@ -1,0 +1,8 @@
+{
+  "name": "pu-erh",
+  "private": true,
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "dev:desktop": "bun --filter @pu-erh/desktop tauri dev"
+  }
+}
