@@ -4,4 +4,5 @@ mod query;
 mod session;
 
 pub use error::CoreError;
+pub use graph::{Block, GraphError, Properties, PropertyValue};
 pub use session::Session;

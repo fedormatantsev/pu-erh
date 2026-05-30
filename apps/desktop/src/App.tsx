@@ -1,29 +1,84 @@
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { Stack, Text } from "@pu-erh/ui";
 
-async function invokeOrError(command: string): Promise<string> {
-  try {
-    return await invoke<string>(command);
-  } catch (error) {
-    return String(error);
-  }
-}
+import { Stack, Text, ViewModeToggle } from "@pu-erh/ui";
 
-export function App() {
-  const [ping, setPing] = useState("…");
-  const [rootId, setRootId] = useState("…");
+import { getBlock } from "./ipc";
+import { ShellProvider, useShell } from "./shell";
+import type { BlockDto } from "./types";
+import { resolveBlockView } from "./views/blockView";
+import { PropertiesView } from "./views/PropertiesView";
+
+// Resolves the current block's `display` to a primary renderer and renders it,
+// surfacing an unrecognized `display` value before falling back to the default.
+function BlockViewHost({ blockId }: { blockId: string }) {
+  const [block, setBlock] = useState<BlockDto | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void invokeOrError("ping").then(setPing);
-    void invokeOrError("root_id").then(setRootId);
-  }, []);
+    let cancelled = false;
+    getBlock(blockId).then(
+      (result) => {
+        if (!cancelled) setBlock(result);
+      },
+      (err) => {
+        if (!cancelled) setError(String(err));
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [blockId]);
+
+  if (error) {
+    return <Text>{error}</Text>;
+  }
+  if (!block) {
+    return null;
+  }
+
+  const { View, unrecognized } = resolveBlockView(block.properties.display);
+  return (
+    <>
+      {unrecognized ? (
+        <Text>Unrecognized display: {unrecognized}</Text>
+      ) : null}
+      <View blockId={blockId} />
+    </>
+  );
+}
+
+// Exactly one of the Block View / Properties View is shown at a time.
+function Workspace() {
+  const { currentBlockId, rootError, viewMode, setViewMode } = useShell();
+
+  if (rootError) {
+    return (
+      <Stack>
+        <Text as="h1">pu-erh</Text>
+        <Text>{rootError}</Text>
+      </Stack>
+    );
+  }
+  if (!currentBlockId) {
+    return null;
+  }
 
   return (
     <Stack>
-      <Text as="h1">pu-erh</Text>
-      <Text>ping: {ping}</Text>
-      <Text>root_id: {rootId}</Text>
+      <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+      {viewMode === "block" ? (
+        <BlockViewHost blockId={currentBlockId} />
+      ) : (
+        <PropertiesView blockId={currentBlockId} />
+      )}
     </Stack>
+  );
+}
+
+export function App() {
+  return (
+    <ShellProvider>
+      <Workspace />
+    </ShellProvider>
   );
 }

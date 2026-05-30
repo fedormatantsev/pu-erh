@@ -1,3 +1,4 @@
 pub mod state;
 
-pub use state::{AppState, PING_RESPONSE};
+pub use pu_erh_core::PropertyValue;
+pub use state::{AppState, BlockDto, PING_RESPONSE};

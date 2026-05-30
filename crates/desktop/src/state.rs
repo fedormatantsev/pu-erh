@@ -1,9 +1,31 @@
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use pu_erh_core::{CoreError, Session};
+use pu_erh_core::{Block, CoreError, GraphError, Properties, PropertyValue, Session};
+use serde::Serialize;
+use uuid::Uuid;
 
 pub const PING_RESPONSE: &str = "pong";
+
+/// Serializable view of a block for the frontend: id as string, the raw
+/// property map, and whether the block has children (so the tree can show an
+/// expand affordance before expanding).
+#[derive(Debug, Serialize)]
+pub struct BlockDto {
+    pub id: String,
+    pub properties: Properties,
+    pub has_children: bool,
+}
+
+impl BlockDto {
+    fn new(block: Block, has_children: bool) -> Self {
+        Self {
+            id: block.id.to_string(),
+            properties: block.properties,
+            has_children,
+        }
+    }
+}
 
 pub struct AppState {
     session: Mutex<Session>,
@@ -27,6 +49,48 @@ impl AppState {
             .map(|id| id.to_string())
             .map_err(|err| err.to_string())
     }
+
+    pub fn block(&self, id: &str) -> Result<BlockDto, String> {
+        let id = parse_uuid(id)?;
+        let session = self.session.lock().map_err(|err| err.to_string())?;
+        let kb = session.knowledge_base();
+        let block = kb
+            .block(id)
+            .ok_or_else(|| CoreError::from(GraphError::BlockNotFound(id)).to_string())?;
+        let has_children = kb.has_children(id);
+        Ok(BlockDto::new(block, has_children))
+    }
+
+    pub fn children(&self, id: &str) -> Result<Vec<BlockDto>, String> {
+        let parent = parse_uuid(id)?;
+        let session = self.session.lock().map_err(|err| err.to_string())?;
+        let children = session
+            .query(&format!("children:{parent}"))
+            .map_err(|err| err.to_string())?;
+        let kb = session.knowledge_base();
+        Ok(children
+            .into_iter()
+            .map(|block| {
+                let has_children = kb.has_children(block.id);
+                BlockDto::new(block, has_children)
+            })
+            .collect())
+    }
+
+    pub fn set_property(&self, id: &str, key: String, value: PropertyValue) -> Result<(), String> {
+        let id = parse_uuid(id)?;
+        let mut session = self.session.lock().map_err(|err| err.to_string())?;
+        session.set_property(id, key, value).map_err(|err| err.to_string())
+    }
+
+    pub fn save(&self) -> Result<(), String> {
+        let mut session = self.session.lock().map_err(|err| err.to_string())?;
+        session.save().map_err(|err| err.to_string())
+    }
+}
+
+fn parse_uuid(value: &str) -> Result<Uuid, String> {
+    Uuid::parse_str(value).map_err(|err| err.to_string())
 }
 
 #[cfg(test)]
@@ -49,5 +113,62 @@ mod tests {
         let path = dir.path().join("pu-erh/kb.json");
         let state = AppState::open_at(path.clone()).expect("open");
         assert!(state.root_id().is_err());
+    }
+
+    fn state_with_root() -> (AppState, String, tempfile::TempDir) {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join("pu-erh/kb.json");
+        let state = AppState::open_at(path).expect("open");
+        state.save().expect("save creates root");
+        let root = state.root_id().expect("root id");
+        (state, root, dir)
+    }
+
+    #[test]
+    fn children_round_trip_reports_has_children() {
+        let (state, root, _dir) = state_with_root();
+        assert!(state.children(&root).expect("children").is_empty());
+
+        // Create a child and a grandchild through the session.
+        let child = {
+            let mut session = state.session.lock().unwrap();
+            let root_id = session.root_id().unwrap();
+            let child = session.create_block(Some(root_id)).unwrap();
+            session.create_block(Some(child)).unwrap();
+            child.to_string()
+        };
+
+        let children = state.children(&root).expect("children");
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].id, child);
+        assert!(children[0].has_children, "child has a grandchild");
+    }
+
+    #[test]
+    fn set_property_round_trip_visible_in_block() {
+        let (state, _root, _dir) = state_with_root();
+        let child = {
+            let mut session = state.session.lock().unwrap();
+            let root_id = session.root_id().unwrap();
+            session.create_block(Some(root_id)).unwrap().to_string()
+        };
+
+        state
+            .set_property(&child, "display".to_string(), PropertyValue::String("tree".to_string()))
+            .expect("set_property");
+
+        let dto = state.block(&child).expect("block");
+        assert_eq!(
+            dto.properties.get("display"),
+            Some(&PropertyValue::String("tree".to_string()))
+        );
+    }
+
+    #[test]
+    fn block_missing_surfaces_error() {
+        let (state, _root, _dir) = state_with_root();
+        let missing = uuid::Uuid::new_v4().to_string();
+        let err = state.block(&missing).unwrap_err();
+        assert!(err.contains("block not found"), "got: {err}");
     }
 }

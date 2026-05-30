@@ -681,7 +681,9 @@ name = "desktop"
 version = "0.1.0"
 dependencies = [
  "pu-erh-core",
+ "serde",
  "tempfile",
+ "uuid",
 ]
 
 [[package]]

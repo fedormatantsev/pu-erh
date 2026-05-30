@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use graph::{Block, KnowledgeBase};
+use graph::{Block, KnowledgeBase, PropertyValue};
 use storage::{load, save};
 use uuid::Uuid;
 
@@ -61,6 +61,17 @@ impl Session {
 
     pub fn delete_block(&mut self, id: Uuid) -> Result<(), CoreError> {
         mutation::delete_block(&mut self.kb, id)?;
+        self.dirty = true;
+        Ok(())
+    }
+
+    pub fn set_property(
+        &mut self,
+        id: Uuid,
+        key: String,
+        value: PropertyValue,
+    ) -> Result<(), CoreError> {
+        mutation::set_property(&mut self.kb, id, key, value)?;
         self.dirty = true;
         Ok(())
     }

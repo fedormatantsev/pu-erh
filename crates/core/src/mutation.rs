@@ -1,4 +1,4 @@
-use graph::{EdgeType, GraphError, KnowledgeBase, Properties};
+use graph::{EdgeType, GraphError, KnowledgeBase, Properties, PropertyValue};
 use uuid::Uuid;
 
 use crate::error::CoreError;
@@ -90,6 +90,19 @@ pub fn delete_block(kb: &mut KnowledgeBase, id: Uuid) -> Result<(), CoreError> {
     Ok(())
 }
 
+pub fn set_property(
+    kb: &mut KnowledgeBase,
+    id: Uuid,
+    key: String,
+    value: PropertyValue,
+) -> Result<(), CoreError> {
+    let block = kb.block(id).ok_or(GraphError::BlockNotFound(id))?;
+    let mut properties = block.properties;
+    properties.insert(key, value);
+    kb.append_block_version(id, false, properties);
+    Ok(())
+}
+
 fn is_ancestor(kb: &KnowledgeBase, ancestor: Uuid, mut current: Uuid) -> Result<bool, CoreError> {
     while let Some(parent) = kb.parent_edge_target(current) {
         if parent == ancestor {
@@ -172,6 +185,66 @@ mod tests {
             delete_block(&mut kb, child).unwrap_err(),
             CoreError::DeleteWithChildren
         ));
+    }
+
+    #[test]
+    fn set_property_sets_and_overwrites() {
+        let (mut kb, root) = test_state();
+        let child = create_block(&mut kb, Some(root)).unwrap();
+
+        set_property(
+            &mut kb,
+            child,
+            "display".to_string(),
+            PropertyValue::String("tree".to_string()),
+        )
+        .unwrap();
+        set_property(
+            &mut kb,
+            child,
+            "title".to_string(),
+            PropertyValue::String("first".to_string()),
+        )
+        .unwrap();
+        let props = kb.block(child).unwrap().properties;
+        assert_eq!(
+            props.get("display"),
+            Some(&PropertyValue::String("tree".to_string()))
+        );
+        assert_eq!(
+            props.get("title"),
+            Some(&PropertyValue::String("first".to_string()))
+        );
+
+        set_property(
+            &mut kb,
+            child,
+            "title".to_string(),
+            PropertyValue::String("second".to_string()),
+        )
+        .unwrap();
+        let props = kb.block(child).unwrap().properties;
+        assert_eq!(
+            props.get("title"),
+            Some(&PropertyValue::String("second".to_string()))
+        );
+        // other keys untouched
+        assert_eq!(
+            props.get("display"),
+            Some(&PropertyValue::String("tree".to_string()))
+        );
+    }
+
+    #[test]
+    fn set_property_on_missing_block_errors_and_appends_nothing() {
+        let (mut kb, _root) = test_state();
+        let missing = Uuid::new_v4();
+        let before = kb.block_version_records().len();
+        assert!(matches!(
+            set_property(&mut kb, missing, "k".to_string(), PropertyValue::Null).unwrap_err(),
+            CoreError::Graph(GraphError::BlockNotFound(_))
+        ));
+        assert_eq!(kb.block_version_records().len(), before);
     }
 
     #[test]

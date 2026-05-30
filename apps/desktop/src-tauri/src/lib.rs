@@ -1,6 +1,6 @@
 mod commands;
 
-use commands::{ping, root_id};
+use commands::{block, children, ping, root_id, save, set_property};
 use desktop::AppState;
 use tauri::Manager;
 
@@ -20,7 +20,14 @@ pub fn run() {
             app.manage(state);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![ping, root_id])
+        .invoke_handler(tauri::generate_handler![
+            ping,
+            root_id,
+            block,
+            children,
+            set_property,
+            save
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
