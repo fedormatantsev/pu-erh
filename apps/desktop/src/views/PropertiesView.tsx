@@ -74,7 +74,7 @@ export function PropertiesView({ blockId }: { blockId: string }) {
         ))}
       </select>
       <Stack gap="0.5rem">
-        <Button onClick={persist}>Save</Button>
+        <Button onPress={persist}>Save</Button>
       </Stack>
       {error ? <Text>{error}</Text> : null}
     </PropertiesPanel>

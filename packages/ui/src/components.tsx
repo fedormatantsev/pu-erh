@@ -1,4 +1,9 @@
 import type { CSSProperties, ReactNode } from "react";
+import {
+  Button as AriaButton,
+  type ButtonProps as AriaButtonProps,
+  Separator,
+} from "react-aria-components";
 
 type BadgeProps = {
   children: ReactNode;
@@ -20,7 +25,7 @@ export function Card({ children }: CardProps) {
 }
 
 export function Divider() {
-  return <div className="pu-erh-divider" role="separator" />;
+  return <Separator className="pu-erh-divider" />;
 }
 
 import "./styles.css";
@@ -47,28 +52,13 @@ export function Stack({ children, gap = "0.5rem" }: StackProps) {
   );
 }
 
-type ButtonProps = {
-  children: ReactNode;
-  disabled?: boolean;
-  onClick?: () => void;
-  type?: "button" | "submit" | "reset";
-};
+type ButtonProps = Pick<AriaButtonProps, "children" | "onPress" | "isDisabled" | "type">;
 
-export function Button({
-  children,
-  disabled = false,
-  onClick,
-  type = "button",
-}: ButtonProps) {
+export function Button({ children, onPress, isDisabled, type = "button" }: ButtonProps) {
   return (
-    <button
-      className="pu-erh-button"
-      disabled={disabled}
-      onClick={onClick}
-      type={type}
-    >
+    <AriaButton className="pu-erh-button" onPress={onPress} isDisabled={isDisabled} type={type}>
       {children}
-    </button>
+    </AriaButton>
   );
 }
 
@@ -83,13 +73,9 @@ type InlineBlockProps = {
 
 export function InlineBlock({ label, onActivate }: InlineBlockProps) {
   return (
-    <button
-      className="pu-erh-inline-block"
-      onClick={onActivate}
-      type="button"
-    >
+    <AriaButton className="pu-erh-inline-block" onPress={onActivate} type="button">
       {label}
-    </button>
+    </AriaButton>
   );
 }
 
@@ -111,15 +97,15 @@ export function TreeNode({
   return (
     <div className="pu-erh-tree-node">
       <div className="pu-erh-tree-row">
-        <button
+        <AriaButton
           aria-label={expanded ? "collapse" : "expand"}
           className="pu-erh-tree-toggle"
-          disabled={!hasChildren}
-          onClick={onToggle}
+          isDisabled={!hasChildren}
+          onPress={onToggle}
           type="button"
         >
           {hasChildren ? (expanded ? "▾" : "▸") : "·"}
-        </button>
+        </AriaButton>
         {label}
       </div>
       {expanded && children ? (
@@ -139,12 +125,12 @@ type ViewModeToggleProps = {
 export function ViewModeToggle({ mode, onChange }: ViewModeToggleProps) {
   return (
     <div className="pu-erh-view-mode-toggle" role="group">
-      <Button disabled={mode === "block"} onClick={() => onChange("block")}>
+      <Button isDisabled={mode === "block"} onPress={() => onChange("block")}>
         Block View
       </Button>
       <Button
-        disabled={mode === "properties"}
-        onClick={() => onChange("properties")}
+        isDisabled={mode === "properties"}
+        onPress={() => onChange("properties")}
       >
         Properties
       </Button>

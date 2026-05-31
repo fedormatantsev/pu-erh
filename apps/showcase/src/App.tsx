@@ -350,9 +350,9 @@ function ComponentsSection() {
         <Stack gap="var(--space-3)">
           <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "center" }}>
             <Button>Default</Button>
-            <Button disabled>Disabled</Button>
+            <Button isDisabled>Disabled</Button>
           </div>
-          <span style={styles.mono}>Button — uses --font-sans, --space-2/4, --radius-sm</span>
+          <span style={styles.mono}>Button — React Aria · props: onPress, isDisabled · uses --font-sans, --space-2/4, --radius-sm</span>
         </Stack>
       </Disclosure>
 

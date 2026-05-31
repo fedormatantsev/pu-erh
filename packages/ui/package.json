@@ -6,6 +6,10 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "dependencies": {
+    "modern-normalize": "^3.0.1",
+    "react-aria-components": "^1.10.1"
+  },
   "peerDependencies": {
     "react": "^18 || ^19"
   },

@@ -1,9 +1,4 @@
-# base-components Specification
-
-## Purpose
-React UI components exported from `@pu-erh/ui`, built on design tokens and React Aria for accessibility.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Button React component built on React Aria
 The system SHALL export a `Button` React component from `packages/ui/src/index.ts`. It SHALL be implemented using `Button` from `react-aria-components`. It SHALL accept `children`, `onPress` (replaces `onClick`), `isDisabled` (replaces `disabled`), and `type` props. Its styles SHALL use `[data-disabled]` and `[data-focused]` attribute selectors for state styling instead of `:disabled` and `:focus` pseudo-classes.
@@ -58,3 +53,9 @@ No CSS in `styles.css` SHALL hard-code pixel values, hex colors, or raw font siz
 #### Scenario: No hard-coded hex colors in component styles
 - **WHEN** `styles.css` is audited
 - **THEN** no color hex values appear outside `tokens.css`
+
+## REMOVED Requirements
+
+### Requirement: Existing Button component migrated to token vars
+**Reason:** Superseded by the React Aria–based Button requirement above, which covers token usage as part of its broader specification.
+**Migration:** The new Button requirement includes the token-only styling constraint; no separate migration step needed.

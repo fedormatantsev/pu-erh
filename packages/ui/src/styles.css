@@ -1,3 +1,4 @@
+@import "modern-normalize";
 @import "./tokens.css";
 
 .pu-erh-stack {
@@ -24,11 +25,21 @@
   background: transparent;
   color: var(--color-text);
   cursor: pointer;
+  outline: none;
 }
 
-.pu-erh-button:disabled {
+.pu-erh-button[data-disabled] {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.pu-erh-button[data-focused] {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+.pu-erh-button[data-pressed] {
+  opacity: 0.8;
 }
 
 .pu-erh-inline-block {
@@ -40,6 +51,17 @@
   text-align: left;
   cursor: pointer;
   color: var(--color-text);
+  outline: none;
+}
+
+.pu-erh-inline-block[data-focused] {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+.pu-erh-inline-block[data-disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .pu-erh-tree-row {
@@ -58,9 +80,14 @@
   color: var(--color-text-muted);
 }
 
-.pu-erh-tree-toggle:disabled {
+.pu-erh-tree-toggle[data-disabled] {
   cursor: default;
   opacity: 0.4;
+}
+
+.pu-erh-tree-toggle[data-focused] {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 1px;
 }
 
 .pu-erh-tree-children {

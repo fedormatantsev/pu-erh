@@ -1,4 +1,20 @@
-## ADDED Requirements
+# design-tokens Specification
+
+## Purpose
+CSS custom property design tokens and stylesheet layering for `@pu-erh/ui`.
+
+## Requirements
+
+### Requirement: modern-normalize CSS reset applied as first stylesheet layer
+`packages/ui/src/styles.css` SHALL import `modern-normalize` as its very first rule, before the token import and before all component styles. This ensures browser default styles are normalised for all consumers of `@pu-erh/ui`.
+
+#### Scenario: Reset applied before tokens
+- **WHEN** a browser loads the stylesheet bundle from `@pu-erh/ui`
+- **THEN** `modern-normalize` styles appear before any `--space-*` or component class declarations in the resolved CSS
+
+#### Scenario: Box-sizing is border-box globally
+- **WHEN** any element is rendered after importing `@pu-erh/ui`
+- **THEN** `getComputedStyle(el).boxSizing` returns `"border-box"` (applied by `modern-normalize`)
 
 ### Requirement: Spacing scale defined as CSS custom properties in packages/ui
 The system SHALL define a spacing scale on `:root` in `packages/ui/src/tokens.css` using CSS custom properties with a 4 px base unit: `--space-1` (4 px) through `--space-16` (64 px), covering at minimum steps 1, 2, 3, 4, 6, 8, 10, 12, 16.
