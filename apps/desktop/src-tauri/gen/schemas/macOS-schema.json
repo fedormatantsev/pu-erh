@@ -189,6 +189,12 @@
           "markdownDescription": "Enables the children command"
         },
         {
+          "description": "Enables the create_block command",
+          "type": "string",
+          "const": "allow-create-block",
+          "markdownDescription": "Enables the create_block command"
+        },
+        {
           "description": "Enables the parent command",
           "type": "string",
           "const": "allow-parent",

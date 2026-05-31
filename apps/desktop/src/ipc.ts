@@ -33,6 +33,10 @@ export function setProperty(
   return invoke<void>("set_property", { id, key, value });
 }
 
+export function createBlock(parent: string): Promise<string> {
+  return invoke<string>("create_block", { parent });
+}
+
 export function save(): Promise<void> {
   return invoke<void>("save");
 }

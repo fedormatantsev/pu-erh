@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  ActionBar,
   Badge,
   Button,
   Card,
@@ -11,6 +12,8 @@ import {
   TreeColumn,
   TreeColumns,
 } from "@pu-erh/ui";
+
+type ViewMode = "block" | "properties";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -347,6 +350,49 @@ function RadiiSection() {
 
 // ── Components section (progressive disclosure) ───────────────────────────────
 
+// Live ActionBar example. State is local to the showcase — the toggle flips a
+// local mode and create-child just bumps a local counter; no session, no IPC.
+// The ActionBar is fixed-positioned, so a `transform` on the demo box makes it
+// the containing block, pinning the bar to the box's upper-left instead of the
+// viewport.
+function ActionBarExample() {
+  const [mode, setMode] = useState<ViewMode>("block");
+  const [created, setCreated] = useState(0);
+  return (
+    <Stack gap="var(--space-3)">
+      <div
+        style={{
+          position: "relative",
+          transform: "translateZ(0)",
+          minHeight: 96,
+          padding: "var(--space-6)",
+          background: "var(--color-surface)",
+          borderRadius: "var(--radius-md)",
+          overflow: "hidden",
+        }}
+      >
+        <ActionBar
+          mode={mode}
+          onToggleMode={() =>
+            setMode((m) => (m === "block" ? "properties" : "block"))
+          }
+          onCreateChild={() => setCreated((n) => n + 1)}
+          canCreateChild
+        />
+        <div style={{ paddingTop: "var(--space-10)" }}>
+          <span style={styles.mono}>
+            mode: {mode} · children created: {created}
+          </span>
+        </div>
+      </div>
+      <span style={styles.mono}>
+        ActionBar — fixed upper-left overlay · props: mode, onToggleMode,
+        onCreateChild, canCreateChild · session-agnostic
+      </span>
+    </Stack>
+  );
+}
+
 function ComponentsSection() {
   return (
     <Section title="Components">
@@ -408,6 +454,10 @@ function ComponentsSection() {
           </Stack>
           <span style={styles.mono}>Stack — flex column, gap prop maps to --space-* token</span>
         </Stack>
+      </Disclosure>
+
+      <Disclosure summary="ActionBar">
+        <ActionBarExample />
       </Disclosure>
 
       <Disclosure summary="TreeView columns">

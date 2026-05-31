@@ -121,6 +121,24 @@
   gap: var(--space-2);
 }
 
+/* Compact, low-contrast floating overlay pinned to the upper-left. It sits
+   above content without a decorative border or background that competes with
+   it, and does not displace the content beneath. */
+.pu-erh-action-bar {
+  position: fixed;
+  top: var(--space-4);
+  left: var(--space-4);
+  z-index: 10;
+  display: flex;
+  gap: var(--space-2);
+  opacity: 0.7;
+}
+
+.pu-erh-action-bar:hover,
+.pu-erh-action-bar:focus-within {
+  opacity: 1;
+}
+
 .pu-erh-properties-panel {
   display: flex;
   flex-direction: column;

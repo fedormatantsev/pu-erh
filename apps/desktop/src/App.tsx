@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { Stack, Text, ViewModeToggle } from "@pu-erh/ui";
+import { ActionBar, Stack, Text } from "@pu-erh/ui";
 
 import { getBlock } from "./ipc";
 import { ShellProvider, useShell } from "./shell";
@@ -47,9 +47,17 @@ function BlockViewHost({ blockId }: { blockId: string }) {
   );
 }
 
-// Exactly one of the Block View / Properties View is shown at a time.
+// Exactly one of the Block View / Properties View is shown at a time. The
+// action bar overlay hosts the view-mode toggle and the create-child action.
 function Workspace() {
-  const { currentBlockId, rootError, viewMode, setViewMode } = useShell();
+  const {
+    currentBlockId,
+    rootError,
+    actionError,
+    viewMode,
+    setViewMode,
+    createChild,
+  } = useShell();
 
   if (rootError) {
     return (
@@ -65,7 +73,15 @@ function Workspace() {
 
   return (
     <Stack>
-      <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+      <ActionBar
+        mode={viewMode}
+        onToggleMode={() =>
+          setViewMode(viewMode === "block" ? "properties" : "block")
+        }
+        onCreateChild={createChild}
+        canCreateChild={currentBlockId != null}
+      />
+      {actionError ? <Text>{actionError}</Text> : null}
       {viewMode === "block" ? (
         <BlockViewHost blockId={currentBlockId} />
       ) : (

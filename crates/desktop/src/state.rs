@@ -101,6 +101,17 @@ impl AppState {
         session.set_property(id, key, value).map_err(|err| err.to_string())
     }
 
+    /// Creates a new child of `parent` through the session and returns the new
+    /// block id. The append is held in memory; no save occurs here.
+    pub fn create_block(&self, parent: &str) -> Result<String, String> {
+        let parent = parse_uuid(parent)?;
+        let mut session = self.session.lock().map_err(|err| err.to_string())?;
+        session
+            .create_block(Some(parent))
+            .map(|id| id.to_string())
+            .map_err(|err| err.to_string())
+    }
+
     pub fn save(&self) -> Result<(), String> {
         let mut session = self.session.lock().map_err(|err| err.to_string())?;
         session.save().map_err(|err| err.to_string())
@@ -224,6 +235,24 @@ mod tests {
             dto.properties.get("display"),
             Some(&PropertyValue::String("tree".to_string()))
         );
+    }
+
+    #[test]
+    fn create_block_appends_child_visible_in_children() {
+        let (state, root, _dir) = state_with_root();
+        let child = state.create_block(&root).expect("create child");
+
+        let children = state.children(&root).expect("children");
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].id, child);
+    }
+
+    #[test]
+    fn create_block_nonexistent_parent_surfaces_error() {
+        let (state, _root, _dir) = state_with_root();
+        let missing = uuid::Uuid::new_v4().to_string();
+        let err = state.create_block(&missing).unwrap_err();
+        assert!(!err.is_empty(), "expected a CoreError-derived message");
     }
 
     #[test]

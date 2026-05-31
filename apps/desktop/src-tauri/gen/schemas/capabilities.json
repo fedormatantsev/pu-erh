@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Default capability for the main window","local":true,"windows":["main"],"permissions":["core:default","allow-ping","allow-root-id","allow-block","allow-parent","allow-children","allow-set-property","allow-save"]}}
+{"default":{"identifier":"default","description":"Default capability for the main window","local":true,"windows":["main"],"permissions":["core:default","allow-ping","allow-root-id","allow-block","allow-parent","allow-children","allow-create-block","allow-set-property","allow-save"]}}

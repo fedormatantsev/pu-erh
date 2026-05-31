@@ -37,6 +37,11 @@ pub fn set_property(
 }
 
 #[tauri::command]
+pub fn create_block(state: State<AppState>, parent: String) -> Result<String, String> {
+    state.create_block(&parent)
+}
+
+#[tauri::command]
 pub fn save(state: State<AppState>) -> Result<(), String> {
     state.save()
 }

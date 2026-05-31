@@ -32,7 +32,7 @@ type Columns = {
 // selected block and re-centers the columns (the default view's selection
 // policy). Columns derive entirely from the current selected block.
 export function DefaultBlockView({ blockId }: { blockId: string }) {
-  const { selectBlock } = useShell();
+  const { selectBlock, refreshToken } = useShell();
   const [columns, setColumns] = useState<Columns | null>(null);
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -59,7 +59,9 @@ export function DefaultBlockView({ blockId }: { blockId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [blockId]);
+    // refreshToken re-reads the columns (e.g. after a child is created) without
+    // changing the current selected block.
+  }, [blockId, refreshToken]);
 
   // Focus the container on each selection so arrow-key navigation works without
   // requiring a click first (and after a click re-centers and remounts cells).

@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-create-block"
+description = "Enables the create_block command"
+commands.allow = ["create_block"]

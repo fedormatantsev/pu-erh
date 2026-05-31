@@ -5,10 +5,6 @@ import { Button, PropertiesPanel, Stack, Text } from "@pu-erh/ui";
 import { getBlock, save, setProperty } from "../ipc";
 import { BLOCK_VIEW_NAMES } from "./blockView";
 
-// Properties whose values are rendered in dedicated layout slots above the
-// generic property list. These keys are excluded from the generic list.
-const LAYOUT_SLOT_PROPERTIES = new Set(["display"]);
-
 // Settings of the current Block View. The `display` property is rendered in its
 // own dedicated slot (a dropdown with no label) above the generic property list.
 // Absent or unrecognized `display` values resolve to "default" implicitly and
