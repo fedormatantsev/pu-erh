@@ -1,5 +1,28 @@
 import type { CSSProperties, ReactNode } from "react";
 
+type BadgeProps = {
+  children: ReactNode;
+  variant?: "neutral" | "primary";
+};
+
+export function Badge({ children, variant = "neutral" }: BadgeProps) {
+  return (
+    <span className={`pu-erh-badge pu-erh-badge--${variant}`}>{children}</span>
+  );
+}
+
+type CardProps = {
+  children: ReactNode;
+};
+
+export function Card({ children }: CardProps) {
+  return <div className="pu-erh-card">{children}</div>;
+}
+
+export function Divider() {
+  return <div className="pu-erh-divider" role="separator" />;
+}
+
 import "./styles.css";
 
 type TextProps = {

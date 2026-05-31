@@ -1,5 +1,8 @@
 export {
+  Badge,
   Button,
+  Card,
+  Divider,
   InlineBlock,
   PropertiesPanel,
   Stack,

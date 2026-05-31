@@ -1,3 +1,5 @@
+@import "./tokens.css";
+
 .pu-erh-stack {
   display: flex;
   flex-direction: column;
@@ -5,61 +7,104 @@
 
 .pu-erh-text {
   margin: 0;
-  font-family: system-ui, sans-serif;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-base);
+  color: var(--color-text);
 }
 
 .pu-erh-button {
-  font: inherit;
-  padding: 0.375rem 0.75rem;
-  border: 1px solid currentColor;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   background: transparent;
+  color: var(--color-text);
   cursor: pointer;
 }
 
 .pu-erh-button:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 .pu-erh-inline-block {
-  font: inherit;
-  padding: 0.125rem 0.25rem;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-2);
   border: none;
   background: transparent;
   text-align: left;
   cursor: pointer;
+  color: var(--color-text);
 }
 
 .pu-erh-tree-row {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: var(--space-1);
 }
 
 .pu-erh-tree-toggle {
-  font: inherit;
-  width: 1.25rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  width: var(--space-6);
   border: none;
   background: transparent;
   cursor: pointer;
+  color: var(--color-text-muted);
 }
 
 .pu-erh-tree-toggle:disabled {
   cursor: default;
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
 .pu-erh-tree-children {
-  margin-left: 1rem;
+  margin-left: var(--space-4);
 }
 
 .pu-erh-view-mode-toggle {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .pu-erh-properties-panel {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-2);
+}
+
+.pu-erh-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+}
+
+.pu-erh-badge--neutral {
+  background: var(--color-neutral-100);
+  color: var(--color-neutral-700);
+}
+
+.pu-erh-badge--primary {
+  background: var(--color-primary-500);
+  color: var(--color-neutral-0);
+}
+
+.pu-erh-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.pu-erh-divider {
+  margin: var(--space-4) 0;
 }
