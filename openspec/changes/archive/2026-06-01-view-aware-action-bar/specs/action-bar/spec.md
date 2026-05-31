@@ -1,24 +1,4 @@
-# action-bar Specification
-
-## Purpose
-
-Defines the action bar overlay: a compact floating panel in the upper-left corner exposing shell-level actions (view-mode toggle and create-child), with presentational parts session-agnostic in the design system.
-## Requirements
-### Requirement: Action bar overlay surface
-
-The application MUST present an **action bar**: a compact floating panel pinned to the upper-left corner of the window that overlays the active content surface (the Block View or the Properties View). The action bar MUST be subordinate chrome per the `ui-direction` capability — low contrast, compact, with no decorative border or background that competes with content — and MUST NOT displace or resize the content beneath it. The action bar MUST expose exactly the actions defined by this capability and MUST NOT introduce navigation trees, sidebars, menus, or other unspecified surfaces.
-
-#### Scenario: Action bar overlays the content in the upper-left
-
-- **WHEN** the application renders its content surface
-- **THEN** the action bar is shown as a floating panel in the upper-left corner over the content
-- **AND** the content surface fills the available width beneath it without being displaced
-
-#### Scenario: Action bar exposes only the defined actions
-
-- **WHEN** the action bar is rendered
-- **THEN** it shows only the actions provided by the currently active view
-- **AND** it adds no navigation tree, sidebar, menu, or other surface
+## MODIFIED Requirements
 
 ### Requirement: Action bar exposes only the defined actions
 

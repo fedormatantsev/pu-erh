@@ -155,39 +155,37 @@ export function PropertiesPanel({ children }: PropertiesPanelProps) {
   return <section className="pu-erh-properties-panel">{children}</section>;
 }
 
-// The action bar overlay: a compact floating panel of shell-level actions.
-// Session-agnostic — it receives the active mode, a create-enabled flag, and
-// action callbacks as props and never reads shell state or calls IPC.
+// The action bar overlay: a compact floating panel of view-provided actions.
+// Session-agnostic — it receives an ordered list of action descriptors as props
+// and never reads shell state or calls IPC.
 
-type ActionBarProps = {
-  mode: ViewMode;
-  onToggleMode: () => void;
-  onCreateChild: () => void;
-  canCreateChild: boolean;
+type ActionBarAction = {
+  id: string;
+  label: string;
+  onPress: () => void;
+  isDisabled?: boolean;
+  pressed?: boolean;
 };
 
-export function ActionBar({
-  mode,
-  onToggleMode,
-  onCreateChild,
-  canCreateChild,
-}: ActionBarProps) {
-  // A single toggle action; its label is the view it switches to, while the
-  // current mode is communicated through aria-pressed.
-  const target = mode === "block" ? "Properties" : "Block View";
+type ActionBarProps = {
+  actions: ActionBarAction[];
+};
+
+export function ActionBar({ actions }: ActionBarProps) {
   return (
     <div className="pu-erh-action-bar" role="toolbar" aria-label="Actions">
-      <AriaButton
-        className="pu-erh-button"
-        onPress={onToggleMode}
-        type="button"
-        aria-pressed={mode === "properties"}
-      >
-        {target}
-      </AriaButton>
-      <Button onPress={onCreateChild} isDisabled={!canCreateChild}>
-        New child
-      </Button>
+      {actions.map((action) => (
+        <AriaButton
+          key={action.id}
+          className="pu-erh-button"
+          onPress={action.onPress}
+          isDisabled={action.isDisabled}
+          type="button"
+          aria-pressed={action.pressed}
+        >
+          {action.label}
+        </AriaButton>
+      ))}
     </div>
   );
 }

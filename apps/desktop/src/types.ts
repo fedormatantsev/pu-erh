@@ -9,3 +9,11 @@ export type BlockDto = {
 };
 
 export type ViewMode = "block" | "properties";
+
+export type ActionBarAction = {
+  id: string;
+  label: string;
+  onPress: () => void;
+  isDisabled?: boolean;
+  pressed?: boolean;
+};
