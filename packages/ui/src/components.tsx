@@ -79,38 +79,47 @@ export function InlineBlock({ label, onActivate }: InlineBlockProps) {
   );
 }
 
-type TreeNodeProps = {
-  label: ReactNode;
-  hasChildren: boolean;
-  expanded: boolean;
-  onToggle?: () => void;
+// Three-column TreeView layout. Session-agnostic: the container and columns lay
+// out whatever inline-block cells they are given; the current-block highlight is
+// driven by the `current` prop on a cell. No data fetching or selection logic.
+
+type TreeColumnsProps = {
+  children: ReactNode;
+};
+
+export function TreeColumns({ children }: TreeColumnsProps) {
+  return <div className="pu-erh-tree-columns">{children}</div>;
+}
+
+type TreeColumnProps = {
+  label?: ReactNode;
   children?: ReactNode;
 };
 
-export function TreeNode({
-  label,
-  hasChildren,
-  expanded,
-  onToggle,
-  children,
-}: TreeNodeProps) {
+export function TreeColumn({ label, children }: TreeColumnProps) {
   return (
-    <div className="pu-erh-tree-node">
-      <div className="pu-erh-tree-row">
-        <AriaButton
-          aria-label={expanded ? "collapse" : "expand"}
-          className="pu-erh-tree-toggle"
-          isDisabled={!hasChildren}
-          onPress={onToggle}
-          type="button"
-        >
-          {hasChildren ? (expanded ? "▾" : "▸") : "·"}
-        </AriaButton>
-        {label}
-      </div>
-      {expanded && children ? (
-        <div className="pu-erh-tree-children">{children}</div>
+    <div className="pu-erh-tree-column">
+      {label != null ? (
+        <div className="pu-erh-tree-column-label">{label}</div>
       ) : null}
+      <div className="pu-erh-tree-column-items">{children}</div>
+    </div>
+  );
+}
+
+type TreeCellProps = {
+  current?: boolean;
+  children: ReactNode;
+};
+
+export function TreeCell({ current = false, children }: TreeCellProps) {
+  return (
+    <div
+      className={
+        current ? "pu-erh-tree-cell pu-erh-tree-cell--current" : "pu-erh-tree-cell"
+      }
+    >
+      {children}
     </div>
   );
 }

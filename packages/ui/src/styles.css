@@ -64,34 +64,56 @@
   cursor: not-allowed;
 }
 
-.pu-erh-tree-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
+/* Three-column TreeView: parent | current + siblings | children. Generous
+   inter-column space and quiet, uppercase column labels carry the structure;
+   the current cell is marked with a left accent and stronger weight. The
+   container is focusable for arrow-key navigation; the current-cell accent
+   conveys position, so no container focus ring is shown. */
+.pu-erh-tree-view {
+  outline: none;
 }
 
-.pu-erh-tree-toggle {
+.pu-erh-tree-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-10);
+  align-items: start;
+}
+
+.pu-erh-tree-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: var(--space-8);
+}
+
+.pu-erh-tree-column-label {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  width: var(--space-6);
-  border: none;
-  background: transparent;
-  cursor: pointer;
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--color-text-muted);
 }
 
-.pu-erh-tree-toggle[data-disabled] {
-  cursor: default;
-  opacity: 0.4;
+.pu-erh-tree-column-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 }
 
-.pu-erh-tree-toggle[data-focused] {
-  outline: 2px solid var(--color-primary-500);
-  outline-offset: 1px;
+.pu-erh-tree-cell {
+  border-left: 2px solid transparent;
+  padding-left: var(--space-2);
 }
 
-.pu-erh-tree-children {
-  margin-left: var(--space-4);
+.pu-erh-tree-cell--current {
+  border-left-color: var(--color-primary-500);
+}
+
+.pu-erh-tree-cell--current .pu-erh-inline-block {
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
 }
 
 .pu-erh-view-mode-toggle {

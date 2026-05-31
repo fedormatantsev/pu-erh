@@ -189,6 +189,12 @@
           "markdownDescription": "Enables the children command"
         },
         {
+          "description": "Enables the parent command",
+          "type": "string",
+          "const": "allow-parent",
+          "markdownDescription": "Enables the parent command"
+        },
+        {
           "description": "Enables the ping command",
           "type": "string",
           "const": "allow-ping",

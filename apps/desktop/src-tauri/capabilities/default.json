@@ -8,6 +8,7 @@
     "allow-ping",
     "allow-root-id",
     "allow-block",
+    "allow-parent",
     "allow-children",
     "allow-set-property",
     "allow-save"

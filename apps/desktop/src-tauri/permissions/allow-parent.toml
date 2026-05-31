@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-parent"
+description = "Enables the parent command"
+commands.allow = ["parent"]

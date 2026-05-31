@@ -7,6 +7,8 @@ export {
   PropertiesPanel,
   Stack,
   Text,
-  TreeNode,
+  TreeCell,
+  TreeColumn,
+  TreeColumns,
   ViewModeToggle,
 } from "./components";

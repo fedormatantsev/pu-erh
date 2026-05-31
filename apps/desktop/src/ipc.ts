@@ -17,6 +17,10 @@ export function getBlock(id: string): Promise<BlockDto> {
   return invoke<BlockDto>("block", { id });
 }
 
+export function getParent(id: string): Promise<BlockDto | null> {
+  return invoke<BlockDto | null>("parent", { id });
+}
+
 export function getChildren(id: string): Promise<BlockDto[]> {
   return invoke<BlockDto[]>("children", { id });
 }

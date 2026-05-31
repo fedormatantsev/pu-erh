@@ -17,6 +17,11 @@ pub fn block(state: State<AppState>, id: String) -> Result<BlockDto, String> {
 }
 
 #[tauri::command]
+pub fn parent(state: State<AppState>, id: String) -> Result<Option<BlockDto>, String> {
+    state.parent(&id)
+}
+
+#[tauri::command]
 pub fn children(state: State<AppState>, id: String) -> Result<Vec<BlockDto>, String> {
     state.children(&id)
 }

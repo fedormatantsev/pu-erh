@@ -1,8 +1,14 @@
-import { useEffect, useState, type ReactElement } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactElement,
+} from "react";
 
-import { Text, TreeNode } from "@pu-erh/ui";
+import { Text, TreeCell, TreeColumn, TreeColumns } from "@pu-erh/ui";
 
-import { getChildren } from "../ipc";
+import { getBlock, getChildren, getParent } from "../ipc";
 import { useShell } from "../shell";
 import type { BlockDto, PropertyValue } from "../types";
 import { resolveInlineView } from "./inlineView";
@@ -11,60 +17,120 @@ import { resolveInlineView } from "./inlineView";
 // View content. Selected by the block's `display` property via the router below.
 export type BlockView = (props: { blockId: string }) => ReactElement;
 
-// One level of the tree: the children of `blockId`, each rendered inline, each
-// expandable to its own children. Children load lazily when first rendered.
-function TreeBranch({ blockId }: { blockId: string }) {
-  const { expandedIds, toggleExpanded, selectBlock } = useShell();
-  const [children, setChildren] = useState<BlockDto[] | null>(null);
+// The three columns derived from the current selected block: its parent (left),
+// the current block together with its siblings (center), and its children
+// (right). Siblings are the parent's children, or just the current block when it
+// is the root and therefore has no parent.
+type Columns = {
+  parent: BlockDto | null;
+  siblings: BlockDto[];
+  children: BlockDto[];
+};
+
+// The default Block View: a three-column TreeView (parent | current + siblings |
+// children). Activating a cell or pressing an arrow key changes the current
+// selected block and re-centers the columns (the default view's selection
+// policy). Columns derive entirely from the current selected block.
+export function DefaultBlockView({ blockId }: { blockId: string }) {
+  const { selectBlock } = useShell();
+  const [columns, setColumns] = useState<Columns | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
-    getChildren(blockId).then(
-      (result) => {
-        if (!cancelled) setChildren(result);
-      },
-      (err) => {
+    setColumns(null);
+    setError(null);
+    (async () => {
+      try {
+        const parent = await getParent(blockId);
+        // Siblings come from the parent's children (which includes the current
+        // block); at the root there is no parent, so the current block stands
+        // alone in the center column.
+        const siblings = parent
+          ? await getChildren(parent.id)
+          : [await getBlock(blockId)];
+        const children = await getChildren(blockId);
+        if (!cancelled) setColumns({ parent, siblings, children });
+      } catch (err) {
         if (!cancelled) setError(String(err));
-      },
-    );
+      }
+    })();
     return () => {
       cancelled = true;
     };
   }, [blockId]);
 
+  // Focus the container on each selection so arrow-key navigation works without
+  // requiring a click first (and after a click re-centers and remounts cells).
+  useEffect(() => {
+    containerRef.current?.focus();
+  }, [blockId, columns]);
+
   if (error) {
     return <Text>{error}</Text>;
   }
-  if (children === null) {
-    return null;
+  if (columns === null) {
+    return <></>;
+  }
+
+  const { parent, siblings, children } = columns;
+  const currentIndex = siblings.findIndex((block) => block.id === blockId);
+
+  // Arrow keys move the current selected block; each is a no-op when the target
+  // does not exist (← at root, → with no children, ↑/↓ past the sibling ends).
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    let target: string | null = null;
+    switch (event.key) {
+      case "ArrowLeft":
+        target = parent ? parent.id : null;
+        break;
+      case "ArrowRight":
+        target = children.length > 0 ? children[0].id : null;
+        break;
+      case "ArrowUp":
+        target = currentIndex > 0 ? siblings[currentIndex - 1].id : null;
+        break;
+      case "ArrowDown":
+        target =
+          currentIndex >= 0 && currentIndex < siblings.length - 1
+            ? siblings[currentIndex + 1].id
+            : null;
+        break;
+      default:
+        return;
+    }
+    if (target !== null) {
+      event.preventDefault();
+      selectBlock(target);
+    }
+  }
+
+  function cell(block: BlockDto, current: boolean) {
+    const { View } = resolveInlineView(block.properties.display);
+    return (
+      <TreeCell key={block.id} current={current}>
+        <View block={block} onActivate={() => selectBlock(block.id)} />
+      </TreeCell>
+    );
   }
 
   return (
-    <>
-      {children.map((child) => {
-        const { View } = resolveInlineView(child.properties.display);
-        const expanded = expandedIds.has(child.id);
-        return (
-          <TreeNode
-            key={child.id}
-            hasChildren={child.has_children}
-            expanded={expanded}
-            onToggle={() => toggleExpanded(child.id)}
-            label={<View block={child} onActivate={() => selectBlock(child.id)} />}
-          >
-            {expanded ? <TreeBranch blockId={child.id} /> : null}
-          </TreeNode>
-        );
-      })}
-    </>
+    <div
+      className="pu-erh-tree-view"
+      ref={containerRef}
+      tabIndex={0}
+      onKeyDown={onKeyDown}
+    >
+      <TreeColumns>
+        <TreeColumn>{parent ? cell(parent, false) : null}</TreeColumn>
+        <TreeColumn>
+          {siblings.map((block) => cell(block, block.id === blockId))}
+        </TreeColumn>
+        <TreeColumn>{children.map((block) => cell(block, false))}</TreeColumn>
+      </TreeColumns>
+    </div>
   );
-}
-
-// The default Block View displays the current block's children as a recursive
-// tree. Activating a node selects it (the default view's selection policy).
-export function DefaultBlockView({ blockId }: { blockId: string }) {
-  return <TreeBranch blockId={blockId} />;
 }
 
 const blockRenderers: Record<string, BlockView> = {

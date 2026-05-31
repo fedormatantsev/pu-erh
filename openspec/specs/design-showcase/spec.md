@@ -1,5 +1,8 @@
-## ADDED Requirements
+# design-showcase Specification
 
+## Purpose
+Design system reference app (`apps/showcase`) for visualizing tokens and live `@pu-erh/ui` components.
+## Requirements
 ### Requirement: apps/showcase is a Bun/Vite React workspace app
 The system SHALL provide `apps/showcase/` as a Bun workspace app with:
 - `package.json` named `@pu-erh/showcase`, marked private, with `"@pu-erh/ui": "workspace:*"` as a dependency and `react`, `react-dom` as dependencies.
@@ -51,11 +54,19 @@ The system SHALL render a swatch for each radius token showing a box with that b
 - **THEN** a section labelled "Radii" or equivalent contains one swatch per radius token
 
 ### Requirement: Showcase displays all base components
-The system SHALL render live `@pu-erh/ui` React component examples covering: Button (primary, secondary, disabled), Badge (neutral, primary), Card with sample content, Divider, Text (heading levels and body), Stack.
+
+The system SHALL render live `@pu-erh/ui` React component examples covering: Button (primary, secondary, disabled), Badge (neutral, primary), Card with sample content, Divider, Text (heading levels and body), Stack, and the TreeView column component(s) shown with static sample data (a parent, a current block with siblings, and children) and a distinguished current block.
 
 #### Scenario: Components section is present
+
 - **WHEN** the showcase page is loaded
 - **THEN** a section labelled "Components" or equivalent contains a live rendered example of each exported component
+
+#### Scenario: TreeView column example is present
+
+- **WHEN** the showcase page is loaded
+- **THEN** the Components section contains a live rendered example of the TreeView column component(s) using static sample data
+- **AND** the example renders the three columns (parent, current block with siblings, children) with the current block distinguished
 
 ### Requirement: Showcase has a title and section headings
 The page SHALL have a `<title>` and visible `<h1>` identifying it as the design system reference. Each token category and the components section SHALL have a visible section heading.
@@ -63,3 +74,4 @@ The page SHALL have a `<title>` and visible `<h1>` identifying it as the design 
 #### Scenario: Page has a title and section headings
 - **WHEN** the showcase page is loaded
 - **THEN** the `<title>` and visible heading identify the page, and each section has a heading
+

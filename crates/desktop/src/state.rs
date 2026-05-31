@@ -66,6 +66,19 @@ impl AppState {
         Ok(BlockDto::new(block, has_children))
     }
 
+    pub fn parent(&self, id: &str) -> Result<Option<BlockDto>, String> {
+        let id = parse_uuid(id)?;
+        let session = self.session.lock().map_err(|err| err.to_string())?;
+        let parents = session
+            .query(&format!("parent:{id}"))
+            .map_err(|err| err.to_string())?;
+        let kb = session.knowledge_base();
+        Ok(parents.into_iter().next().map(|block| {
+            let has_children = kb.has_children(block.id);
+            BlockDto::new(block, has_children)
+        }))
+    }
+
     pub fn children(&self, id: &str) -> Result<Vec<BlockDto>, String> {
         let parent = parse_uuid(id)?;
         let session = self.session.lock().map_err(|err| err.to_string())?;
@@ -163,6 +176,34 @@ mod tests {
         assert_eq!(children.len(), 1);
         assert_eq!(children[0].id, child);
         assert!(children[0].has_children, "child has a grandchild");
+    }
+
+    #[test]
+    fn parent_of_child_is_root_with_has_children() {
+        let (state, root, _dir) = state_with_root();
+        let child = {
+            let mut session = state.session.lock().unwrap();
+            let root_id = session.root_id().unwrap();
+            session.create_block(Some(root_id)).unwrap().to_string()
+        };
+
+        let parent = state.parent(&child).expect("parent").expect("has a parent");
+        assert_eq!(parent.id, root);
+        assert!(parent.has_children, "root has the child");
+    }
+
+    #[test]
+    fn parent_of_root_is_none() {
+        let (state, root, _dir) = state_with_root();
+        assert!(state.parent(&root).expect("parent").is_none());
+    }
+
+    #[test]
+    fn parent_missing_surfaces_error() {
+        let (state, _root, _dir) = state_with_root();
+        let missing = uuid::Uuid::new_v4().to_string();
+        let err = state.parent(&missing).unwrap_err();
+        assert!(err.contains("block not found"), "got: {err}");
     }
 
     #[test]

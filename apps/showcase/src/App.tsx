@@ -4,8 +4,12 @@ import {
   Button,
   Card,
   Divider,
+  InlineBlock,
   Stack,
   Text,
+  TreeCell,
+  TreeColumn,
+  TreeColumns,
 } from "@pu-erh/ui";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -403,6 +407,41 @@ function ComponentsSection() {
             <Badge>item three</Badge>
           </Stack>
           <span style={styles.mono}>Stack — flex column, gap prop maps to --space-* token</span>
+        </Stack>
+      </Disclosure>
+
+      <Disclosure summary="TreeView columns">
+        <Stack gap="var(--space-3)">
+          <TreeColumns>
+            <TreeColumn label="Parent">
+              <TreeCell>
+                <InlineBlock label="Garden" />
+              </TreeCell>
+            </TreeColumn>
+            <TreeColumn label="Current + siblings">
+              <TreeCell>
+                <InlineBlock label="Herbs" />
+              </TreeCell>
+              <TreeCell current>
+                <InlineBlock label="Vegetables" />
+              </TreeCell>
+              <TreeCell>
+                <InlineBlock label="Flowers" />
+              </TreeCell>
+            </TreeColumn>
+            <TreeColumn label="Children">
+              <TreeCell>
+                <InlineBlock label="Tomato" />
+              </TreeCell>
+              <TreeCell>
+                <InlineBlock label="Pepper" />
+              </TreeCell>
+            </TreeColumn>
+          </TreeColumns>
+          <span style={styles.mono}>
+            TreeColumns / TreeColumn / TreeCell — 3-column grid, gap --space-10;
+            current cell marked with a --color-primary-500 left accent
+          </span>
         </Stack>
       </Disclosure>
     </Section>
