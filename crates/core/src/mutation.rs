@@ -1,4 +1,4 @@
-use graph::{EdgeType, GraphError, KnowledgeBase, Properties, PropertyValue};
+use graph::{EdgeType, GraphError, KnowledgeBase, OrderError, PositionHint, Properties, PropertyValue};
 use uuid::Uuid;
 
 use crate::error::CoreError;
@@ -7,21 +7,25 @@ use crate::error::CoreError;
 // the active view is already consistent and only apply cheap local checks (tombstone,
 // unknown edge type, missing endpoints on point lookups).
 
-pub fn create_block(kb: &mut KnowledgeBase, parent: Option<Uuid>) -> Result<Uuid, CoreError> {
+pub fn create_block(
+    kb: &mut KnowledgeBase,
+    parent: Option<Uuid>,
+    position: PositionHint,
+) -> Result<Uuid, CoreError> {
     let parent = parent.ok_or(CoreError::ParentRequired)?;
     if kb.block(parent).is_none() {
         return Err(GraphError::BlockNotFound(parent).into());
     }
 
+    let (left, right) = kb.resolve_position(parent, position)?;
+    let order = graph::generate_key_between(left.as_deref(), right.as_deref())
+        .map_err(|e: OrderError| GraphError::InvalidGraph(e.to_string()))?;
+
     let id = Uuid::new_v4();
     kb.append_block_version(id, false, Properties::new());
-    kb.append_edge_version(
-        id,
-        parent,
-        EdgeType::Parent,
-        false,
-        Properties::new(),
-    );
+    let mut edge_props = Properties::new();
+    edge_props.insert("order".into(), PropertyValue::String(order));
+    kb.append_edge_version(id, parent, EdgeType::Parent, false, edge_props);
     Ok(id)
 }
 
@@ -29,6 +33,7 @@ pub fn move_block(
     kb: &mut KnowledgeBase,
     id: Uuid,
     new_parent: Option<Uuid>,
+    position: PositionHint,
 ) -> Result<(), CoreError> {
     let new_parent = new_parent.ok_or(CoreError::ParentRequired)?;
 
@@ -45,23 +50,17 @@ pub fn move_block(
         return Err(CoreError::CycleDetected);
     }
 
+    let (left, right) = kb.resolve_position(new_parent, position)?;
+    let order = graph::generate_key_between(left.as_deref(), right.as_deref())
+        .map_err(|e: OrderError| GraphError::InvalidGraph(e.to_string()))?;
+
     if let Some(old_parent) = kb.parent_edge_target(id) {
-        kb.append_edge_version(
-            id,
-            old_parent,
-            EdgeType::Parent,
-            true,
-            Properties::new(),
-        );
+        kb.append_edge_version(id, old_parent, EdgeType::Parent, true, Properties::new());
     }
 
-    kb.append_edge_version(
-        id,
-        new_parent,
-        EdgeType::Parent,
-        false,
-        Properties::new(),
-    );
+    let mut edge_props = Properties::new();
+    edge_props.insert("order".into(), PropertyValue::String(order));
+    kb.append_edge_version(id, new_parent, EdgeType::Parent, false, edge_props);
     Ok(())
 }
 
@@ -116,7 +115,7 @@ fn is_ancestor(kb: &KnowledgeBase, ancestor: Uuid, mut current: Uuid) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use graph::KnowledgeBase;
+    use graph::{KnowledgeBase, PositionHint};
 
     fn test_state() -> (KnowledgeBase, Uuid) {
         let mut kb = KnowledgeBase::empty();
@@ -129,7 +128,7 @@ mod tests {
     fn create_requires_parent() {
         let (mut kb, _) = test_state();
         assert!(matches!(
-            create_block(&mut kb, None).unwrap_err(),
+            create_block(&mut kb, None, PositionHint::Last).unwrap_err(),
             CoreError::ParentRequired
         ));
     }
@@ -137,7 +136,7 @@ mod tests {
     #[test]
     fn create_child_under_root() {
         let (mut kb, root) = test_state();
-        let child = create_block(&mut kb, Some(root)).unwrap();
+        let child = create_block(&mut kb, Some(root), PositionHint::Last).unwrap();
         assert!(kb.block(child).is_some());
         assert_eq!(kb.parent(child).unwrap().unwrap().id, root);
     }
@@ -145,10 +144,10 @@ mod tests {
     #[test]
     fn move_and_delete_leaf() {
         let (mut kb, root) = test_state();
-        let child = create_block(&mut kb, Some(root)).unwrap();
-        let sibling = create_block(&mut kb, Some(root)).unwrap();
+        let child = create_block(&mut kb, Some(root), PositionHint::Last).unwrap();
+        let sibling = create_block(&mut kb, Some(root), PositionHint::Last).unwrap();
 
-        move_block(&mut kb, child, Some(sibling)).unwrap();
+        move_block(&mut kb, child, Some(sibling), PositionHint::Last).unwrap();
         assert_eq!(kb.parent(child).unwrap().unwrap().id, sibling);
 
         delete_block(&mut kb, child).unwrap();
@@ -158,15 +157,15 @@ mod tests {
     #[test]
     fn move_to_root_and_cycle_are_rejected() {
         let (mut kb, root) = test_state();
-        let child = create_block(&mut kb, Some(root)).unwrap();
-        let grandchild = create_block(&mut kb, Some(child)).unwrap();
+        let child = create_block(&mut kb, Some(root), PositionHint::Last).unwrap();
+        let grandchild = create_block(&mut kb, Some(child), PositionHint::Last).unwrap();
 
         assert!(matches!(
-            move_block(&mut kb, child, None).unwrap_err(),
+            move_block(&mut kb, child, None, PositionHint::Last).unwrap_err(),
             CoreError::ParentRequired
         ));
         assert!(matches!(
-            move_block(&mut kb, child, Some(grandchild)).unwrap_err(),
+            move_block(&mut kb, child, Some(grandchild), PositionHint::Last).unwrap_err(),
             CoreError::CycleDetected
         ));
     }
@@ -174,8 +173,8 @@ mod tests {
     #[test]
     fn delete_root_and_parent_with_children_are_rejected() {
         let (mut kb, root) = test_state();
-        let child = create_block(&mut kb, Some(root)).unwrap();
-        let _grandchild = create_block(&mut kb, Some(child)).unwrap();
+        let child = create_block(&mut kb, Some(root), PositionHint::Last).unwrap();
+        let _grandchild = create_block(&mut kb, Some(child), PositionHint::Last).unwrap();
 
         assert!(matches!(
             delete_block(&mut kb, root).unwrap_err(),
@@ -190,7 +189,7 @@ mod tests {
     #[test]
     fn set_property_sets_and_overwrites() {
         let (mut kb, root) = test_state();
-        let child = create_block(&mut kb, Some(root)).unwrap();
+        let child = create_block(&mut kb, Some(root), PositionHint::Last).unwrap();
 
         set_property(
             &mut kb,
@@ -254,13 +253,13 @@ mod tests {
         let before_edges = kb.edge_version_records().len();
 
         assert!(matches!(
-            create_block(&mut kb, None).unwrap_err(),
+            create_block(&mut kb, None, PositionHint::Last).unwrap_err(),
             CoreError::ParentRequired
         ));
         assert_eq!(kb.block_version_records().len(), before_blocks);
         assert_eq!(kb.edge_version_records().len(), before_edges);
 
-        let child = create_block(&mut kb, Some(root)).unwrap();
+        let child = create_block(&mut kb, Some(root), PositionHint::Last).unwrap();
         let before_blocks = kb.block_version_records().len();
 
         assert!(matches!(
@@ -269,5 +268,63 @@ mod tests {
         ));
         assert_eq!(kb.block_version_records().len(), before_blocks);
         assert!(kb.block(child).is_some());
+    }
+
+    #[test]
+    fn create_with_first_position_sorts_before_existing() {
+        let (mut kb, root) = test_state();
+        let existing = create_block(&mut kb, Some(root), PositionHint::Last).unwrap();
+        let first = create_block(&mut kb, Some(root), PositionHint::First).unwrap();
+        let ordered = kb.children_ordered(root);
+        assert_eq!(ordered[0], first);
+        assert_eq!(ordered[1], existing);
+    }
+
+    #[test]
+    fn create_with_after_position() {
+        let (mut kb, root) = test_state();
+        let a = create_block(&mut kb, Some(root), PositionHint::Last).unwrap();
+        let b = create_block(&mut kb, Some(root), PositionHint::Last).unwrap();
+        let mid = create_block(&mut kb, Some(root), PositionHint::After(a)).unwrap();
+        let ordered = kb.children_ordered(root);
+        assert_eq!(ordered[0], a);
+        assert_eq!(ordered[1], mid);
+        assert_eq!(ordered[2], b);
+    }
+
+    #[test]
+    fn create_with_before_position() {
+        let (mut kb, root) = test_state();
+        let a = create_block(&mut kb, Some(root), PositionHint::Last).unwrap();
+        let b = create_block(&mut kb, Some(root), PositionHint::Last).unwrap();
+        let mid = create_block(&mut kb, Some(root), PositionHint::Before(b)).unwrap();
+        let ordered = kb.children_ordered(root);
+        assert_eq!(ordered[0], a);
+        assert_eq!(ordered[1], mid);
+        assert_eq!(ordered[2], b);
+    }
+
+    #[test]
+    fn create_before_nonchild_errors() {
+        let (mut kb, root) = test_state();
+        let stranger = Uuid::new_v4();
+        assert!(matches!(
+            create_block(&mut kb, Some(root), PositionHint::Before(stranger)).unwrap_err(),
+            CoreError::Graph(GraphError::PositionSiblingNotFound(_))
+        ));
+    }
+
+    #[test]
+    fn move_with_position_hint() {
+        let (mut kb, root) = test_state();
+        let a = create_block(&mut kb, Some(root), PositionHint::Last).unwrap();
+        let b = create_block(&mut kb, Some(root), PositionHint::Last).unwrap();
+        let child = create_block(&mut kb, Some(root), PositionHint::Last).unwrap();
+        // Move child to be first
+        move_block(&mut kb, child, Some(root), PositionHint::First).unwrap();
+        let ordered = kb.children_ordered(root);
+        assert_eq!(ordered[0], child);
+        assert!(ordered.contains(&a));
+        assert!(ordered.contains(&b));
     }
 }

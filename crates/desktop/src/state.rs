@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use pu_erh_core::{Block, CoreError, GraphError, Properties, PropertyValue, Session};
+use pu_erh_core::{Block, CoreError, GraphError, PositionHint, Properties, PropertyValue, Session};
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -107,7 +107,7 @@ impl AppState {
         let parent = parse_uuid(parent)?;
         let mut session = self.session.lock().map_err(|err| err.to_string())?;
         session
-            .create_block(Some(parent))
+            .create_block(Some(parent), PositionHint::Last)
             .map(|id| id.to_string())
             .map_err(|err| err.to_string())
     }
@@ -178,8 +178,8 @@ mod tests {
         let child = {
             let mut session = state.session.lock().unwrap();
             let root_id = session.root_id().unwrap();
-            let child = session.create_block(Some(root_id)).unwrap();
-            session.create_block(Some(child)).unwrap();
+            let child = session.create_block(Some(root_id), PositionHint::Last).unwrap();
+            session.create_block(Some(child), PositionHint::Last).unwrap();
             child.to_string()
         };
 
@@ -195,7 +195,7 @@ mod tests {
         let child = {
             let mut session = state.session.lock().unwrap();
             let root_id = session.root_id().unwrap();
-            session.create_block(Some(root_id)).unwrap().to_string()
+            session.create_block(Some(root_id), PositionHint::Last).unwrap().to_string()
         };
 
         let parent = state.parent(&child).expect("parent").expect("has a parent");
@@ -223,7 +223,7 @@ mod tests {
         let child = {
             let mut session = state.session.lock().unwrap();
             let root_id = session.root_id().unwrap();
-            session.create_block(Some(root_id)).unwrap().to_string()
+            session.create_block(Some(root_id), PositionHint::Last).unwrap().to_string()
         };
 
         state

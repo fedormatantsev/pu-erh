@@ -2,7 +2,9 @@ use std::collections::HashSet;
 
 use uuid::Uuid;
 
-use crate::model::{Block, Edge, EdgeType, GraphError, Properties};
+use crate::fractional_index::generate_key_between;
+use crate::model::{Block, Edge, EdgeType, GraphError, PositionHint, Properties};
+use crate::property_value::PropertyValue;
 use crate::radix_trie::{DiffKind, RadixTrieMap, TrieDiffEntry};
 use crate::trie_key::{
     block_entity_prefix, block_version_key_from, edge_entity_prefix, edge_nav_prefix,
@@ -355,6 +357,68 @@ impl KnowledgeBase {
         self.parent_of(child)
     }
 
+    pub fn parent_edge(&self, child: Uuid) -> Option<Edge> {
+        let parent = self.parent_of(child)?;
+        self.active_edge(parent, EdgeType::Parent, child)
+    }
+
+    fn child_order(&self, child: Uuid) -> String {
+        self.parent_edge(child)
+            .and_then(|e| match e.properties.get("order") {
+                Some(PropertyValue::String(s)) => Some(s.clone()),
+                _ => None,
+            })
+            .unwrap_or_default()
+    }
+
+    pub fn children_ordered(&self, parent: Uuid) -> Vec<Uuid> {
+        let mut children = self.children_of(parent);
+        children.sort_by(|a, b| {
+            let oa = self.child_order(*a);
+            let ob = self.child_order(*b);
+            oa.cmp(&ob).then_with(|| a.as_bytes().cmp(b.as_bytes()))
+        });
+        children
+    }
+
+    pub fn resolve_position(
+        &self,
+        parent: Uuid,
+        hint: PositionHint,
+    ) -> Result<(Option<String>, Option<String>), GraphError> {
+        let ordered = self.children_ordered(parent);
+        // Convert empty-sentinel orders to None so generate_key_between gets valid inputs.
+        let valid_order = |s: String| if s.is_empty() { None } else { Some(s) };
+        match hint {
+            PositionHint::Last => {
+                let left = ordered.last().and_then(|id| valid_order(self.child_order(*id)));
+                Ok((left, None))
+            }
+            PositionHint::First => {
+                let right = ordered.first().and_then(|id| valid_order(self.child_order(*id)));
+                Ok((None, right))
+            }
+            PositionHint::After(sibling) => {
+                let pos = ordered
+                    .iter()
+                    .position(|&id| id == sibling)
+                    .ok_or(GraphError::PositionSiblingNotFound(sibling))?;
+                let left = valid_order(self.child_order(ordered[pos]));
+                let right = ordered.get(pos + 1).and_then(|id| valid_order(self.child_order(*id)));
+                Ok((left, right))
+            }
+            PositionHint::Before(sibling) => {
+                let pos = ordered
+                    .iter()
+                    .position(|&id| id == sibling)
+                    .ok_or(GraphError::PositionSiblingNotFound(sibling))?;
+                let right = valid_order(self.child_order(ordered[pos]));
+                let left = pos.checked_sub(1).and_then(|i| valid_order(self.child_order(ordered[i])));
+                Ok((left, right))
+            }
+        }
+    }
+
     pub fn blocks(&self) -> Vec<Block> {
         self.distinct_block_ids()
             .into_iter()
@@ -699,5 +763,89 @@ mod tests {
         left.append_block_version(id, false, Properties::new());
         let merged = left.merge(&left);
         assert_eq!(merged.block_version_records().len(), 1);
+    }
+
+    fn make_child_with_order(kb: &mut KnowledgeBase, parent: Uuid, order: Option<&str>) -> Uuid {
+        let child = Uuid::new_v4();
+        kb.append_block_version(child, false, Properties::new());
+        let mut props = Properties::new();
+        if let Some(o) = order {
+            props.insert("order".into(), PropertyValue::String(o.to_owned()));
+        }
+        kb.append_edge_version(child, parent, EdgeType::Parent, false, props);
+        child
+    }
+
+    #[test]
+    fn children_ordered_by_order_property() {
+        let mut kb = KnowledgeBase::empty();
+        let root = Uuid::new_v4();
+        kb.append_root_block(root);
+        let c1 = make_child_with_order(&mut kb, root, Some("b0"));
+        let c2 = make_child_with_order(&mut kb, root, Some("a0"));
+        let c3 = make_child_with_order(&mut kb, root, Some("c0"));
+        let ordered = kb.children_ordered(root);
+        assert_eq!(ordered, vec![c2, c1, c3]);
+    }
+
+    #[test]
+    fn legacy_blocks_without_order_sort_first() {
+        let mut kb = KnowledgeBase::empty();
+        let root = Uuid::new_v4();
+        kb.append_root_block(root);
+        let legacy = make_child_with_order(&mut kb, root, None);
+        let ordered_child = make_child_with_order(&mut kb, root, Some("a0"));
+        let result = kb.children_ordered(root);
+        assert_eq!(result[0], legacy);
+        assert_eq!(result[1], ordered_child);
+    }
+
+    #[test]
+    fn tie_breaking_by_uuid() {
+        let mut kb = KnowledgeBase::empty();
+        let root = Uuid::new_v4();
+        kb.append_root_block(root);
+        let c1 = make_child_with_order(&mut kb, root, Some("a0"));
+        let c2 = make_child_with_order(&mut kb, root, Some("a0"));
+        let result = kb.children_ordered(root);
+        let mut expected = vec![c1, c2];
+        expected.sort_by(|a, b| a.as_bytes().cmp(b.as_bytes()));
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn resolve_position_last_gives_correct_bounds() {
+        let mut kb = KnowledgeBase::empty();
+        let root = Uuid::new_v4();
+        kb.append_root_block(root);
+        make_child_with_order(&mut kb, root, Some("a0"));
+        make_child_with_order(&mut kb, root, Some("b0"));
+        let (left, right) = kb.resolve_position(root, PositionHint::Last).unwrap();
+        assert_eq!(left, Some("b0".to_owned()));
+        assert_eq!(right, None);
+    }
+
+    #[test]
+    fn resolve_position_before_sibling() {
+        let mut kb = KnowledgeBase::empty();
+        let root = Uuid::new_v4();
+        kb.append_root_block(root);
+        make_child_with_order(&mut kb, root, Some("a0"));
+        let sibling = make_child_with_order(&mut kb, root, Some("b0"));
+        let (left, right) = kb.resolve_position(root, PositionHint::Before(sibling)).unwrap();
+        assert_eq!(left, Some("a0".to_owned()));
+        assert_eq!(right, Some("b0".to_owned()));
+    }
+
+    #[test]
+    fn resolve_position_invalid_sibling_errors() {
+        let mut kb = KnowledgeBase::empty();
+        let root = Uuid::new_v4();
+        kb.append_root_block(root);
+        let stranger = Uuid::new_v4();
+        assert!(matches!(
+            kb.resolve_position(root, PositionHint::Before(stranger)),
+            Err(GraphError::PositionSiblingNotFound(_))
+        ));
     }
 }

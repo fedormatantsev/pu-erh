@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use graph::{Block, KnowledgeBase, PropertyValue};
+use graph::{Block, KnowledgeBase, PositionHint, PropertyValue};
 use storage::{load, save};
 use uuid::Uuid;
 
@@ -47,14 +47,23 @@ impl Session {
         query::execute(&self.kb, expression)
     }
 
-    pub fn create_block(&mut self, parent: Option<Uuid>) -> Result<Uuid, CoreError> {
-        let id = mutation::create_block(&mut self.kb, parent)?;
+    pub fn create_block(
+        &mut self,
+        parent: Option<Uuid>,
+        position: PositionHint,
+    ) -> Result<Uuid, CoreError> {
+        let id = mutation::create_block(&mut self.kb, parent, position)?;
         self.dirty = true;
         Ok(id)
     }
 
-    pub fn move_block(&mut self, id: Uuid, new_parent: Option<Uuid>) -> Result<(), CoreError> {
-        mutation::move_block(&mut self.kb, id, new_parent)?;
+    pub fn move_block(
+        &mut self,
+        id: Uuid,
+        new_parent: Option<Uuid>,
+        position: PositionHint,
+    ) -> Result<(), CoreError> {
+        mutation::move_block(&mut self.kb, id, new_parent, position)?;
         self.dirty = true;
         Ok(())
     }
@@ -98,7 +107,7 @@ mod tests {
         let mut session = Session::open(&path).unwrap();
         session.save().unwrap();
         let root = session.root_id().unwrap();
-        let child = session.create_block(Some(root)).unwrap();
+        let child = session.create_block(Some(root), PositionHint::Last).unwrap();
         session.save().unwrap();
 
         let session = Session::open(&path).unwrap();

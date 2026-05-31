@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use pu_erh_core::Session;
+use pu_erh_core::{PositionHint, Session};
 use uuid::Uuid;
 
 #[derive(Parser)]
@@ -24,11 +24,27 @@ enum Commands {
     Create {
         #[arg(long)]
         parent: Uuid,
+        #[arg(long, conflicts_with_all = ["after", "before", "last"])]
+        first: bool,
+        #[arg(long, conflicts_with_all = ["first", "before", "last"])]
+        after: Option<Uuid>,
+        #[arg(long, conflicts_with_all = ["first", "after", "last"])]
+        before: Option<Uuid>,
+        #[arg(long, conflicts_with_all = ["first", "after", "before"])]
+        last: bool,
     },
     Move {
         id: Uuid,
         #[arg(long)]
         parent: Uuid,
+        #[arg(long, conflicts_with_all = ["after", "before", "last"])]
+        first: bool,
+        #[arg(long, conflicts_with_all = ["first", "before", "last"])]
+        after: Option<Uuid>,
+        #[arg(long, conflicts_with_all = ["first", "after", "last"])]
+        before: Option<Uuid>,
+        #[arg(long, conflicts_with_all = ["first", "after", "before"])]
+        last: bool,
     },
     Delete {
         id: Uuid,
@@ -39,6 +55,15 @@ fn main() {
     if let Err(err) = run() {
         eprintln!("{err:#}");
         std::process::exit(1);
+    }
+}
+
+fn parse_position(first: bool, last: bool, after: Option<Uuid>, before: Option<Uuid>) -> Result<PositionHint> {
+    match (first, last, after, before) {
+        (true, _, _, _) => Ok(PositionHint::First),
+        (_, _, Some(id), _) => Ok(PositionHint::After(id)),
+        (_, _, _, Some(id)) => Ok(PositionHint::Before(id)),
+        _ => Ok(PositionHint::Last),
     }
 }
 
@@ -60,16 +85,18 @@ fn run() -> Result<()> {
                 println!("{}", format_block(&block));
             }
         }
-        Commands::Create { parent } => {
+        Commands::Create { parent, first, last, after, before } => {
+            let position = parse_position(first, last, after, before)?;
             let id = session
-                .create_block(Some(parent))
+                .create_block(Some(parent), position)
                 .context("create failed")?;
             session.save().context("failed to save knowledge base")?;
             println!("{id}");
         }
-        Commands::Move { id, parent } => {
+        Commands::Move { id, parent, first, last, after, before } => {
+            let position = parse_position(first, last, after, before)?;
             session
-                .move_block(id, Some(parent))
+                .move_block(id, Some(parent), position)
                 .context("move failed")?;
             session.save().context("failed to save knowledge base")?;
         }

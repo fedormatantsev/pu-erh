@@ -79,4 +79,14 @@ pub enum GraphError {
     BlockNotFound(Uuid),
     #[error("invalid knowledge base: {0}")]
     InvalidGraph(String),
+    #[error("position sibling not found: {0}")]
+    PositionSiblingNotFound(Uuid),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PositionHint {
+    First,
+    Last,
+    Before(Uuid),
+    After(Uuid),
 }
