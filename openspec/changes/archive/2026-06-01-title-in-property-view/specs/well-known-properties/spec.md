@@ -1,8 +1,5 @@
-# well-known-properties Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by syncing change display-property-selector. Update Purpose after archive.
-## Requirements
 ### Requirement: Well-known properties have dedicated layout slots
 
 The Properties View layout MUST reserve dedicated, fixed-position UI slots for well-known predefined properties. A well-known property MUST NOT appear as an item in the generic properties list — its dedicated slot is its only representation. `title` MUST be the first well-known property slot, followed by `display` as the second.
@@ -25,6 +22,8 @@ The Properties View layout MUST reserve dedicated, fixed-position UI slots for w
 - **THEN** any property key that has a dedicated layout slot is excluded from that list
 - **AND** only properties without dedicated slots appear in the generic list
 
+## ADDED Requirements
+
 ### Requirement: title slot renders as a labeled text input
 
 The dedicated layout slot for `title` MUST render a text input with a visible "Title" label. The input MUST be pre-populated with the block's current `title` string value. When the block has no `title` property or its value is not a string, the input MUST show an empty string as the initial value. Changes to the input MUST be written immediately through the `set_property` mutation exposed by `core::Session`; they MUST NOT wait for the explicit Save action to be applied in memory. Persisting the value to disk MUST only happen when the user invokes the explicit Save control, consistent with the desktop shell's no-save policy.
@@ -46,13 +45,3 @@ The dedicated layout slot for `title` MUST render a text input with a visible "T
 - **WHEN** the user edits the title input
 - **THEN** the change is applied in memory through `core::Session::set_property` immediately
 - **AND** no save to disk occurs until the user invokes the explicit Save control
-
-### Requirement: display slot renders as a dropdown with no label
-
-The dedicated layout slot for `display` MUST render a dropdown (select element) populated with the registered block view names available in the app. No property title label MUST be shown — the slot contains only the dropdown control.
-
-#### Scenario: Display slot shows dropdown only
-
-- **WHEN** the Properties View renders the display slot
-- **THEN** a dropdown is shown with all registered view names as options
-- **AND** no title label is rendered alongside the dropdown

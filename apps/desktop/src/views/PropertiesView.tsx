@@ -5,11 +5,12 @@ import { Button, PropertiesPanel, Stack, Text } from "@pu-erh/ui";
 import { getBlock, save, setProperty } from "../ipc";
 import { BLOCK_VIEW_NAMES } from "./blockView";
 
-// Settings of the current Block View. The `display` property is rendered in its
-// own dedicated slot (a dropdown with no label) above the generic property list.
-// Absent or unrecognized `display` values resolve to "default" implicitly and
+// Settings of the current Block View. Well-known properties (`title`, `display`)
+// each have a dedicated slot rendered before any generic property list.
+// `display` absent or unrecognized values resolve to the default view name and
 // are written to storage on the next save.
 export function PropertiesView({ blockId }: { blockId: string }) {
+  const [title, setTitle] = useState("");
   const [display, setDisplay] = useState(BLOCK_VIEW_NAMES[0]);
   const needsWrite = useRef(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,12 +20,14 @@ export function PropertiesView({ blockId }: { blockId: string }) {
     getBlock(blockId).then(
       (block) => {
         if (cancelled) return;
-        const value = block.properties.display;
+        const titleValue = block.properties.title;
+        setTitle(typeof titleValue === "string" ? titleValue : "");
+        const displayValue = block.properties.display;
         const resolved =
-          typeof value === "string" && BLOCK_VIEW_NAMES.includes(value)
-            ? value
+          typeof displayValue === "string" && BLOCK_VIEW_NAMES.includes(displayValue)
+            ? displayValue
             : BLOCK_VIEW_NAMES[0];
-        needsWrite.current = resolved !== value;
+        needsWrite.current = resolved !== displayValue;
         setDisplay(resolved);
       },
       (err) => {
@@ -35,6 +38,12 @@ export function PropertiesView({ blockId }: { blockId: string }) {
       cancelled = true;
     };
   }, [blockId]);
+
+  const onTitleChange = (value: string) => {
+    setTitle(value);
+    setError(null);
+    setProperty(blockId, "title", value).catch((err) => setError(String(err)));
+  };
 
   const onDisplayChange = (value: string) => {
     setDisplay(value);
@@ -59,6 +68,14 @@ export function PropertiesView({ blockId }: { blockId: string }) {
   return (
     <PropertiesPanel>
       <Text as="h1">Properties</Text>
+      <label>
+        Title
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => onTitleChange(e.target.value)}
+        />
+      </label>
       <select
         value={display}
         onChange={(e) => onDisplayChange(e.target.value)}
