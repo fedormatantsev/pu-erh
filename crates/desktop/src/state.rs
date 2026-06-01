@@ -33,7 +33,7 @@ pub struct AppState {
 
 impl AppState {
     pub fn kb_path(base: &Path) -> PathBuf {
-        base.join("pu-erh").join("kb.json")
+        base.join("pu-erh").join("kb")
     }
 
     pub fn open_at(path: PathBuf) -> Result<Self, CoreError> {
@@ -194,41 +194,45 @@ mod tests {
         let base = Path::new("/tmp/data");
         assert_eq!(
             AppState::kb_path(base),
-            PathBuf::from("/tmp/data/pu-erh/kb.json")
+            PathBuf::from("/tmp/data/pu-erh/kb")
         );
     }
 
     #[test]
-    fn open_at_missing_file_bootstraps_root() {
+    fn open_at_missing_directory_bootstraps_root() {
         let dir = tempdir().expect("tempdir");
-        let path = dir.path().join("pu-erh/kb.json");
+        let path = dir.path().join("pu-erh/kb");
         let state = AppState::open_at(path).expect("open");
         assert!(state.root_id().is_ok(), "root_id must succeed after bootstrap");
     }
 
     fn state_with_root() -> (AppState, String, tempfile::TempDir) {
         let dir = tempdir().expect("tempdir");
-        let path = dir.path().join("pu-erh/kb.json");
+        let path = dir.path().join("pu-erh/kb");
         let state = AppState::open_at(path).expect("open");
         let root = state.root_id().expect("root id");
         (state, root, dir)
     }
 
     #[test]
-    fn open_at_existing_file_does_not_overwrite() {
+    fn open_at_existing_directory_does_not_overwrite() {
         let dir = tempdir().expect("tempdir");
-        let path = dir.path().join("pu-erh/kb.json");
+        let path = dir.path().join("pu-erh/kb");
         AppState::open_at(path.clone()).expect("first open bootstraps");
-        let mtime_before = std::fs::metadata(&path)
-            .expect("file exists")
+        let manifest = path.join("format_version.toml");
+        let mtime_before = std::fs::metadata(&manifest)
+            .expect("manifest exists")
             .modified()
             .expect("mtime");
         AppState::open_at(path.clone()).expect("second open");
-        let mtime_after = std::fs::metadata(&path)
-            .expect("file still exists")
+        let mtime_after = std::fs::metadata(&manifest)
+            .expect("manifest still exists")
             .modified()
             .expect("mtime");
-        assert_eq!(mtime_before, mtime_after, "re-opening existing KB must not modify the file");
+        assert_eq!(
+            mtime_before, mtime_after,
+            "re-opening existing KB must not modify storage on disk"
+        );
     }
 
     #[test]

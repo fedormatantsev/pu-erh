@@ -14,7 +14,7 @@ cargo test
 Initialize a knowledge base and discover the auto-created root id:
 
 ```bash
-FILE=/tmp/kb.json
+FILE=/tmp/kb
 ROOT=$(cargo run -q -p pu-erh -- --file "$FILE" init)
 cargo run -q -p pu-erh -- --file "$FILE" create --parent "$ROOT"
 cargo run -q -p pu-erh -- --file "$FILE" query "children:$ROOT"
@@ -37,7 +37,7 @@ Layout:
 | `packages/ui` | `@pu-erh/ui` design-system components (presentational only) |
 | `apps/desktop` | React app + Tauri shell (`src-tauri/`) |
 
-The desktop shell opens a session at `{app_data_dir}/pu-erh/kb.json`. It exposes scaffold IPC (`ping`, `root_id`) only; no auto-save or file-open UX.
+The desktop shell opens a session at `{app_data_dir}/pu-erh/kb/` (a storage directory). It exposes scaffold IPC (`ping`, `root_id`) only; no auto-save or file-open UX.
 
 ## Architecture
 
@@ -45,20 +45,19 @@ In memory, a knowledge base is a single **trie-backed store** (`KnowledgeBase`):
 
 There is no separate in-memory append log or rematerialization step.
 
-## Storage format (v1)
+## Storage format (version 3)
 
-On disk, version records are stored as JSON arrays — a persistence envelope, not the in-memory structure:
+On disk, each version record is a separate TOML file under a storage directory:
 
-```json
-{
-  "format_version": 1,
-  "block_versions": [...],
-  "edge_versions": [...]
-}
+```
+<storage-dir>/
+  format_version.toml
+  blocks/
+    <trie-key-hex>.toml
+  edges/
+    <trie-key-hex>.toml
 ```
 
-Load inserts each record into the trie; save exports trie contents (sorted by full CRDT key). Each mutation appends new `BlockVersion` or `EdgeVersion` records with BLAKE3 content digests.
-
-This replaces the earlier walking-skeleton snapshot format (`{ "blocks", "edges" }`). There is no migration path — create a new knowledge base file.
+Load inserts each record into the trie; save exports trie contents (one file per record, filename = lowercase hex of the CRDT trie key). Each mutation appends new `BlockVersion` or `EdgeVersion` records with BLAKE3 content digests (binary `PropertyValue` digest encoding).
 
 Replication merges knowledge bases by trie union (identical records share the same full key); conflict resolution happens at read-time winner selection.

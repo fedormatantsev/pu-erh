@@ -6,15 +6,15 @@ use tempfile::tempdir;
 #[test]
 fn cli_smoke_test() {
     let dir = tempdir().unwrap();
-    let file = dir.path().join("kb.json");
-    let file_arg = file.to_string_lossy().into_owned();
+    let storage = dir.path().join("kb");
+    let storage_arg = storage.to_string_lossy().into_owned();
 
-    let mut session = Session::open(&file).unwrap();
+    let mut session = Session::open(&storage).unwrap();
     session.save().unwrap();
     let root = session.root_id().unwrap();
 
     let output = Command::new(env!("CARGO_BIN_EXE_pu-erh"))
-        .args(["--file", &file_arg, "create", "--parent", &root.to_string()])
+        .args(["--file", &storage_arg, "create", "--parent", &root.to_string()])
         .output()
         .unwrap();
     assert!(output.status.success(), "{:?}", output);
@@ -23,7 +23,7 @@ fn cli_smoke_test() {
     let output = Command::new(env!("CARGO_BIN_EXE_pu-erh"))
         .args([
             "--file",
-            &file_arg,
+            &storage_arg,
             "query",
             &format!("children:{root}"),
         ])
@@ -36,7 +36,7 @@ fn cli_smoke_test() {
     let output = Command::new(env!("CARGO_BIN_EXE_pu-erh"))
         .args([
             "--file",
-            &file_arg,
+            &storage_arg,
             "query",
             &format!("parent:{child}"),
         ])
@@ -49,7 +49,7 @@ fn cli_smoke_test() {
     let output = Command::new(env!("CARGO_BIN_EXE_pu-erh"))
         .args([
             "--file",
-            &file_arg,
+            &storage_arg,
             "move",
             &child,
             "--parent",
@@ -60,7 +60,7 @@ fn cli_smoke_test() {
     assert!(output.status.success(), "{:?}", output);
 
     let output = Command::new(env!("CARGO_BIN_EXE_pu-erh"))
-        .args(["--file", &file_arg, "delete", &child])
+        .args(["--file", &storage_arg, "delete", &child])
         .output()
         .unwrap();
     assert!(output.status.success(), "{:?}", output);

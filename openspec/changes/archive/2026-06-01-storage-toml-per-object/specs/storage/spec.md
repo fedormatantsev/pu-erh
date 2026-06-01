@@ -1,12 +1,6 @@
-# storage Specification
+## MODIFIED Requirements
 
-## Purpose
-
-Defines on-disk persistence of version records: TOML files under a storage directory, format version manifest, trie round-trip, missing-directory behavior, digest verification on load, and invalid-storage rejection.
-
-## Requirements
-
-### Requirement: Serialize knowledge base to storage
+### Requirement: Serialize knowledge base to file
 
 The system MUST persist a knowledge base by exporting all block and edge version records from the in-memory version tries into a **storage directory** with:
 
@@ -14,7 +8,7 @@ The system MUST persist a knowledge base by exporting all block and edge version
 - one TOML file per block version record under `blocks/`;
 - one TOML file per edge version record under `edges/`.
 
-Each record file MUST contain the serde fields of `BlockVersion` or `EdgeVersion` respectively. Saved version records MUST use digests computed with the binary `PropertyValue` digest encoding. Record filenames MUST be the lowercase hexadecimal encoding of that record's trie key (`block_version_key_from` / `edge_version_key_from`).
+Each record file MUST contain the serde fields of `BlockVersion` or `EdgeVersion` respectively. Saved version records MUST use digests computed with the binary `PropertyValue` digest encoding (same algorithm as storage format version 2). Record filenames MUST be the lowercase hexadecimal encoding of that record's trie key (`block_version_key_from` / `edge_version_key_from`).
 
 On save, the system MUST remove stale `*.toml` files in `blocks/` and `edges/` that are not part of the current export set.
 
@@ -30,7 +24,7 @@ On save, the system MUST remove stale `*.toml` files in `blocks/` and `edges/` t
 - **THEN** `blocks/` contains N `*.toml` files and `edges/` contains M `*.toml` files
 - **AND** `format_version.toml` declares version 3
 
-### Requirement: Load builds trie from storage
+### Requirement: Load builds trie from file
 
 When loading from storage, the system MUST construct the in-memory knowledge base by reading each version record TOML file under `blocks/` and `edges/`, deserializing it, verifying its digest, and inserting it into the appropriate version trie. The system MUST NOT retain a separate in-memory vector of the same records alongside the trie.
 
@@ -72,9 +66,11 @@ When loading from a storage directory that exists but contains an invalid manife
 - **WHEN** storage is loaded from a directory whose `format_version.toml` declares an unsupported `format_version`
 - **THEN** the system returns an error describing the version mismatch
 
+## ADDED Requirements
+
 ### Requirement: Storage format version 3
 
-The system MUST use `format_version` `3` for all knowledge bases written by this implementation. Format version 3 is the directory layout with per-record TOML files under `blocks/` and `edges/` and binary `PropertyValue` digest encoding.
+The system MUST use `format_version` `3` for knowledge bases written after this change. Format version 3 stores per-record TOML files under `blocks/` and `edges/` with binary `PropertyValue` digest encoding.
 
 #### Scenario: Version 3 directory saves and loads
 

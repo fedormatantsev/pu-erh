@@ -1,9 +1,5 @@
-# session Specification
+## MODIFIED Requirements
 
-## Purpose
-
-Defines the user session as the coordinator for one trie-backed knowledge base per storage file: load/save, dirty tracking, root initialization on first save, and direct trie updates on mutation.
-## Requirements
 ### Requirement: Session owns graph
 
 A user session MUST hold one trie-backed knowledge base for one storage directory and be the sole entry point for reads and writes during that session.
@@ -49,29 +45,3 @@ The session MUST track whether the knowledge base has been modified and support 
 
 - **WHEN** a session is opened for a missing storage directory
 - **THEN** the session is marked dirty so the first save persists the root block
-
-### Requirement: Direct trie update on mutation
-
-After a successful mutation, the session MUST insert new version records into the knowledge base tries without rebuilding from a separate in-memory log.
-
-#### Scenario: Mutation validates before append
-
-- **WHEN** a mutation is requested through the session
-- **THEN** invariant validation runs against the current knowledge base before version records are inserted
-
-#### Scenario: No rematerialize after mutation
-
-- **WHEN** a mutation succeeds
-- **THEN** new version records are present in the knowledge base tries
-- **AND** the session does not rebuild tries from a vector history
-
-### Requirement: Adapter-defined open-time persistence
-
-The session capability defines generic load, save, and dirty semantics. Adapters (for example **`desktop-shell`**) MAY define additional open-time persistence policies that cause an earlier save than the generic "first save creates root" flow. Such policies MUST live in adapter capabilities and MUST NOT alter **`session`** requirements for CLI or batch use.
-
-#### Scenario: Desktop interim open policy does not change session contract
-
-- **WHEN** the desktop adapter auto-saves on first open per **`desktop-shell`**, Requirement: **Desktop open policy (interim)**
-- **THEN** **`session`** still defines that a new session opened without an adapter policy has no version records until first save
-- **AND** **`cli`** behavior is unchanged
-

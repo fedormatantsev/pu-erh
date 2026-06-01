@@ -1,7 +1,7 @@
 use std::fmt;
 
 use serde::de::{self, Deserialize, Deserializer, SeqAccess, Visitor};
-use serde::ser::{Serialize, Serializer};
+use serde::ser::{Serialize, SerializeMap, Serializer};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PropertyValue {
@@ -48,7 +48,12 @@ impl PropertyValue {
 impl Serialize for PropertyValue {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            Self::Null => serializer.serialize_unit(),
+            // TOML (and some other formats) cannot represent serde unit; use a sentinel table.
+            Self::Null => {
+                let mut map = serializer.serialize_map(Some(1))?;
+                map.serialize_entry("null", &true)?;
+                map.end()
+            }
             Self::Boolean(value) => serializer.serialize_bool(*value),
             Self::Number(value) => serializer.serialize_f64(*value),
             Self::String(value) => serializer.serialize_str(value),
@@ -107,8 +112,27 @@ impl<'de> Visitor<'de> for PropertyValueVisitor {
         Deserialize::deserialize(deserializer)
     }
 
-    fn visit_map<A: de::MapAccess<'de>>(self, _map: A) -> Result<Self::Value, A::Error> {
-        Err(de::Error::custom("object property values are not supported"))
+    fn visit_map<A: de::MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+        let mut null_marker = false;
+        let mut other_keys = 0usize;
+        while let Some(key) = map.next_key::<String>()? {
+            if key == "null" {
+                let value: bool = map.next_value()?;
+                if value {
+                    null_marker = true;
+                } else {
+                    return Err(de::Error::custom("null marker must be true"));
+                }
+            } else {
+                other_keys += 1;
+                let _: de::IgnoredAny = map.next_value()?;
+            }
+        }
+        if null_marker && other_keys == 0 {
+            Ok(PropertyValue::Null)
+        } else {
+            Err(de::Error::custom("object property values are not supported"))
+        }
     }
 
     fn visit_seq<A: SeqAccess<'de>>(self, _seq: A) -> Result<Self::Value, A::Error> {

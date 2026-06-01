@@ -108,7 +108,7 @@ mod tests {
     #[test]
     fn open_new_knowledge_base_initializes_root_on_save() {
         let dir = tempdir().unwrap();
-        let path = dir.path().join("kb.json");
+        let path = dir.path().join("kb");
 
         let mut session = Session::open(&path).unwrap();
         session.save().unwrap();
@@ -122,9 +122,9 @@ mod tests {
     }
 
     #[test]
-    fn read_only_session_does_not_mark_existing_file_dirty() {
+    fn read_only_session_does_not_mark_existing_storage_dirty() {
         let dir = tempdir().unwrap();
-        let path = dir.path().join("kb.json");
+        let path = dir.path().join("kb");
 
         let mut session = Session::open(&path).unwrap();
         session.save().unwrap();
@@ -134,13 +134,13 @@ mod tests {
         let _ = session.query(&format!("children:{root}")).unwrap();
         drop(session);
 
-        let metadata = std::fs::metadata(&path).unwrap();
-        let first_modified = metadata.modified().unwrap();
+        let manifest = path.join("format_version.toml");
+        let first_modified = std::fs::metadata(&manifest).unwrap().modified().unwrap();
         std::thread::sleep(std::time::Duration::from_millis(10));
         let session = Session::open(&path).unwrap();
         let _ = session.query(&format!("children:{root}")).unwrap();
         drop(session);
-        let metadata = std::fs::metadata(&path).unwrap();
+        let metadata = std::fs::metadata(&manifest).unwrap();
         assert_eq!(metadata.modified().unwrap(), first_modified);
     }
 }
