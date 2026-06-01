@@ -122,6 +122,12 @@ impl AppState {
         session.set_property(id, key, value).map_err(|err| err.to_string())
     }
 
+    pub fn remove_property(&self, id: &str, key: String) -> Result<(), String> {
+        let id = parse_uuid(id)?;
+        let mut session = self.session.lock().map_err(|err| err.to_string())?;
+        session.remove_property(id, key).map_err(|err| err.to_string())
+    }
+
     /// Creates a new child of `parent` through the session and returns the new
     /// block id. When `after` is a sibling id the child is placed immediately
     /// after it; otherwise it is appended last. The change is held in memory; no

@@ -102,6 +102,21 @@ pub fn set_property(
     Ok(())
 }
 
+pub fn remove_property(
+    kb: &mut KnowledgeBase,
+    id: Uuid,
+    key: String,
+) -> Result<(), CoreError> {
+    let block = kb.block(id).ok_or(GraphError::BlockNotFound(id))?;
+    if !block.properties.contains_key(&key) {
+        return Err(CoreError::PropertyNotFound(key));
+    }
+    let mut properties = block.properties;
+    properties.remove(&key);
+    kb.append_block_version(id, false, properties);
+    Ok(())
+}
+
 fn is_ancestor(kb: &KnowledgeBase, ancestor: Uuid, mut current: Uuid) -> Result<bool, CoreError> {
     while let Some(parent) = kb.parent_edge_target(current) {
         if parent == ancestor {
@@ -232,6 +247,44 @@ mod tests {
             props.get("display"),
             Some(&PropertyValue::String("tree".to_string()))
         );
+    }
+
+    #[test]
+    fn remove_property_removes_key() {
+        let (mut kb, root) = test_state();
+        let child = create_block(&mut kb, Some(root), PositionHint::Last).unwrap();
+        set_property(&mut kb, child, "foo".to_string(), PropertyValue::String("bar".to_string())).unwrap();
+        set_property(&mut kb, child, "baz".to_string(), PropertyValue::Boolean(true)).unwrap();
+
+        remove_property(&mut kb, child, "foo".to_string()).unwrap();
+
+        let props = kb.block(child).unwrap().properties;
+        assert!(!props.contains_key("foo"), "key should be removed");
+        assert_eq!(props.get("baz"), Some(&PropertyValue::Boolean(true)), "other keys untouched");
+    }
+
+    #[test]
+    fn remove_property_on_missing_block_errors_and_appends_nothing() {
+        let (mut kb, _root) = test_state();
+        let missing = Uuid::new_v4();
+        let before = kb.block_version_records().len();
+        assert!(matches!(
+            remove_property(&mut kb, missing, "k".to_string()).unwrap_err(),
+            CoreError::Graph(GraphError::BlockNotFound(_))
+        ));
+        assert_eq!(kb.block_version_records().len(), before);
+    }
+
+    #[test]
+    fn remove_property_on_missing_key_errors_and_appends_nothing() {
+        let (mut kb, root) = test_state();
+        let child = create_block(&mut kb, Some(root), PositionHint::Last).unwrap();
+        let before = kb.block_version_records().len();
+        assert!(matches!(
+            remove_property(&mut kb, child, "nonexistent".to_string()).unwrap_err(),
+            CoreError::PropertyNotFound(_)
+        ));
+        assert_eq!(kb.block_version_records().len(), before);
     }
 
     #[test]

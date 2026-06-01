@@ -85,6 +85,12 @@ impl Session {
         Ok(())
     }
 
+    pub fn remove_property(&mut self, id: Uuid, key: String) -> Result<(), CoreError> {
+        mutation::remove_property(&mut self.kb, id, key)?;
+        self.dirty = true;
+        Ok(())
+    }
+
     fn ensure_root(&mut self) -> Result<Uuid, CoreError> {
         if self.kb.is_empty() {
             let root_id = Uuid::new_v4();

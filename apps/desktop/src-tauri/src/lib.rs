@@ -2,7 +2,7 @@ mod commands;
 
 use commands::{
     block, children, children_ordered, create_block, delete_block, move_block, parent, ping,
-    root_id, save, set_property,
+    remove_property, root_id, save, set_property,
 };
 use desktop::AppState;
 use tauri::Manager;
@@ -34,6 +34,7 @@ pub fn run() {
             delete_block,
             move_block,
             set_property,
+            remove_property,
             save
         ])
         .run(tauri::generate_context!())

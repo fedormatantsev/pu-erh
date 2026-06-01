@@ -22,4 +22,6 @@ pub enum CoreError {
     DeleteRootForbidden,
     #[error("cannot delete block with children")]
     DeleteWithChildren,
+    #[error("property not found: {0}")]
+    PropertyNotFound(String),
 }

@@ -39,6 +39,10 @@ export function setProperty(
   return invoke<void>("set_property", { id, key, value });
 }
 
+export function removeProperty(id: string, key: string): Promise<void> {
+  return invoke<void>("remove_property", { id, key });
+}
+
 // Creates a child of `parent`. When `after` is a sibling id the child is placed
 // immediately after it; otherwise it is appended last.
 export function createBlock(parent: string, after?: string): Promise<string> {

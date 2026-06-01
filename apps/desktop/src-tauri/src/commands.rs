@@ -65,6 +65,15 @@ pub fn move_block(
 }
 
 #[tauri::command]
+pub fn remove_property(
+    state: State<AppState>,
+    id: String,
+    key: String,
+) -> Result<(), String> {
+    state.remove_property(&id, key)
+}
+
+#[tauri::command]
 pub fn save(state: State<AppState>) -> Result<(), String> {
     state.save()
 }

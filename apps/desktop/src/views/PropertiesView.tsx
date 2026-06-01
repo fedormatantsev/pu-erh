@@ -2,25 +2,28 @@ import { useEffect, useRef, useState } from "react";
 
 import { Button, PropertiesPanel, Stack, Text } from "@pu-erh/ui";
 
-import { getBlock, save, setProperty } from "../ipc";
+import { getBlock, removeProperty, save, setProperty } from "../ipc";
 import { BLOCK_VIEW_NAMES } from "./blockView";
 
-// Settings of the current Block View. Well-known properties (`title`, `display`)
-// each have a dedicated slot rendered before any generic property list.
-// `display` absent or unrecognized values resolve to the default view name and
-// are written to storage on the next save.
-//
-// `body` is a reserved property (serialized rich text owned by the Document
-// View); like other reserved keys it is never surfaced as a generic, editable
-// property item. This view renders no generic properties list yet, so reserved
-// keys are inherently excluded; any future generic list MUST skip RESERVED_KEYS.
 const RESERVED_KEYS = ["title", "display", "body"] as const;
-void RESERVED_KEYS;
+type ReservedKey = (typeof RESERVED_KEYS)[number];
+function isReserved(key: string): key is ReservedKey {
+  return (RESERVED_KEYS as readonly string[]).includes(key);
+}
+
 export function PropertiesView({ blockId }: { blockId: string }) {
   const [title, setTitle] = useState("");
   const [display, setDisplay] = useState(BLOCK_VIEW_NAMES[0]);
   const needsWrite = useRef(false);
   const [error, setError] = useState<string | null>(null);
+
+  // User properties: all keys not in RESERVED_KEYS.
+  const [userProps, setUserProps] = useState<Record<string, string>>({});
+
+  // Add-property form state.
+  const [addKey, setAddKey] = useState("");
+  const [addValue, setAddValue] = useState("");
+  const [addError, setAddError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +39,15 @@ export function PropertiesView({ blockId }: { blockId: string }) {
             : BLOCK_VIEW_NAMES[0];
         needsWrite.current = resolved !== displayValue;
         setDisplay(resolved);
+
+        // Collect user properties (non-reserved string and non-string values shown as strings).
+        const user: Record<string, string> = {};
+        for (const [k, v] of Object.entries(block.properties)) {
+          if (!isReserved(k)) {
+            user[k] = v == null ? "" : String(v);
+          }
+        }
+        setUserProps(user);
       },
       (err) => {
         if (!cancelled) setError(String(err));
@@ -57,6 +69,41 @@ export function PropertiesView({ blockId }: { blockId: string }) {
     needsWrite.current = false;
     setError(null);
     setProperty(blockId, "display", value).catch((err) => setError(String(err)));
+  };
+
+  const onRemoveProperty = (key: string) => {
+    setError(null);
+    removeProperty(blockId, key).then(
+      () => {
+        setUserProps((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+      },
+      (err) => setError(String(err)),
+    );
+  };
+
+  const onAddProperty = () => {
+    const trimmedKey = addKey.trim();
+    if (!trimmedKey) {
+      setAddError("Key must not be empty.");
+      return;
+    }
+    if (isReserved(trimmedKey)) {
+      setAddError(`"${trimmedKey}" is a reserved key.`);
+      return;
+    }
+    setAddError(null);
+    setProperty(blockId, trimmedKey, addValue).then(
+      () => {
+        setUserProps((prev) => ({ ...prev, [trimmedKey]: addValue }));
+        setAddKey("");
+        setAddValue("");
+      },
+      (err) => setError(String(err)),
+    );
   };
 
   const persist = async () => {
@@ -93,6 +140,35 @@ export function PropertiesView({ blockId }: { blockId: string }) {
           </option>
         ))}
       </select>
+
+      {Object.entries(userProps).map(([key, value]) => (
+        <Stack key={key} gap="0.25rem">
+          <span>{key}: {value}</span>
+          <button type="button" onClick={() => onRemoveProperty(key)}>
+            Remove
+          </button>
+        </Stack>
+      ))}
+
+      <Stack gap="0.25rem">
+        <input
+          type="text"
+          placeholder="key"
+          value={addKey}
+          onChange={(e) => { setAddKey(e.target.value); setAddError(null); }}
+        />
+        <input
+          type="text"
+          placeholder="value"
+          value={addValue}
+          onChange={(e) => setAddValue(e.target.value)}
+        />
+        <button type="button" onClick={onAddProperty}>
+          Add
+        </button>
+        {addError ? <Text>{addError}</Text> : null}
+      </Stack>
+
       <Stack gap="0.5rem">
         <Button onPress={persist}>Save</Button>
       </Stack>
