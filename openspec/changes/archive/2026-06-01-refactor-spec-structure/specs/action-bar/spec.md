@@ -1,9 +1,5 @@
-# action-bar Specification
+## MODIFIED Requirements
 
-## Purpose
-
-Defines the action bar overlay: a compact floating panel in the upper-left corner exposing shell-level actions (view-mode toggle and create-child), with presentational parts session-agnostic in the design system.
-## Requirements
 ### Requirement: Action bar overlay surface
 
 The application MUST present an **action bar**: a compact floating panel pinned to the upper-left corner that overlays the active content surface (Block View or Properties View). The action bar MUST be subordinate chrome per **`ui-direction`**. It MUST NOT displace or resize content beneath it. The action bar MUST render exactly the actions provided by the active view's descriptor factory per **`desktop-shell-ui`**, Requirement: **View Router** — it MUST NOT introduce navigation trees, sidebars, menus, or other unspecified surfaces.
@@ -102,3 +98,10 @@ When the Tree View is active per **`tree-view`**, Requirement: **Tree View actio
 - **WHEN** the create-child mutation returns an error
 - **THEN** the error is surfaced as the `CoreError`-derived value without friendly rewriting
 
+## REMOVED Requirements
+
+### Requirement: Action bar exposes only the defined actions
+
+**Reason**: Duplicated by **Action bar overlay surface** and **Action bar is presentational with shell-owned state**.
+
+**Migration**: Use the merged requirements above; active views declare actions via **`tree-view`** and **`properties-view`**.

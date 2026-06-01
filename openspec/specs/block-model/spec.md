@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the logical block and edge model for pu-erh: UUID identity, property maps, parent-edge hierarchy, single root invariant, and how active entities are derived from version history at read time.
+Defines the logical block and edge model for pu-erh: UUID identity, property maps, parent-edge hierarchy, and single root invariant. Active read semantics defer to **`immutable-snapshot`**.
 ## Requirements
 ### Requirement: Block identity
 
@@ -144,4 +144,13 @@ Block and edge structure in the active view MUST be determined by materializing 
 
 - **WHEN** the winning version of a block is tombstoned
 - **THEN** that block does not appear in the active view
+
+### Requirement: Active read semantics reference
+
+Logical blocks and edges defined in this capability are materialized at read time from version history. Active entity resolution, tombstone exclusion, conflict resolution, and per-call reads MUST follow **`immutable-snapshot`**. Version record layout and digests MUST follow **`version-history`**.
+
+#### Scenario: Point read uses immutable snapshot
+
+- **WHEN** a consumer reads a block or edge through the knowledge base API
+- **THEN** the active entity is derived per **`immutable-snapshot`**, not from a separate cached materialization layer defined in this capability
 

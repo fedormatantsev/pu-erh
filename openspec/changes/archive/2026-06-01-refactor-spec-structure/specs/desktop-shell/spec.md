@@ -1,79 +1,22 @@
-# desktop-shell Specification
+## ADDED Requirements
 
-## Purpose
+### Requirement: Desktop open policy (interim)
 
-Defines the Tauri desktop shell: `crates/desktop` adapter, in-process `core::Session`, minimal IPC commands, and anti-default constraints (no auto-save, no invented product UX).
-## Requirements
-### Requirement: Desktop crate in Cargo workspace
+Until a storage-engine capability with autosave is specified, when `AppState` is opened at a path where no knowledge base file exists, the desktop adapter MUST automatically save the session so the root block is materialized before any frontend calls are served. After `open_at` returns successfully, `root_id()` MUST succeed. This policy is adapter-specific and MUST NOT be assumed by **`session`**, **`cli`**, or future REPL mode.
 
-The repository MUST include a `crates/desktop` library crate as a member of the root Cargo workspace.
+#### Scenario: First launch creates root block
 
-#### Scenario: Workspace builds desktop crate
+- **WHEN** `AppState::open_at` is called with a path that does not exist on disk
+- **THEN** `open_at` saves the session automatically
+- **AND** `root_id()` returns a valid UUID immediately after `open_at` returns
 
-- **WHEN** a developer runs `cargo build -p desktop`
-- **THEN** the desktop crate compiles successfully against `pu-erh-core`
+#### Scenario: Existing knowledge base is not re-saved on open
 
-### Requirement: Tauri application host
+- **WHEN** `AppState::open_at` is called with a path to an existing knowledge base file
+- **THEN** no additional save is performed during `open_at`
+- **AND** the file on disk is not modified by the open operation alone
 
-The repository MUST include a Tauri 2 application under `apps/desktop/src-tauri` that launches a webview window and loads the React frontend built by Vite.
-
-#### Scenario: Dev mode launches window
-
-- **WHEN** a developer runs the documented desktop dev command from the repo root
-- **THEN** a Tauri window opens displaying the React frontend
-- **AND** the webview loads assets from the Vite dev server or built output as configured in `tauri.conf.json`
-
-### Requirement: In-process session ownership
-
-The Tauri process MUST hold exactly one `core::Session` for the application lifetime, opened at startup via the desktop adapter.
-
-#### Scenario: Session opened at startup
-
-- **WHEN** the Tauri application starts
-- **THEN** the desktop adapter calls `Session::open` with a deterministic storage path under the application data directory
-- **AND** the session remains available until process exit
-
-#### Scenario: No duplicated domain logic
-
-- **WHEN** the desktop adapter performs session operations
-- **THEN** it MUST call `core::Session` (or shared helpers in `crates/desktop`) only
-- **AND** MUST NOT reimplement mutation validation, trie logic, or storage format handling in the Tauri crate
-
-### Requirement: Minimal IPC commands
-
-The desktop shell MUST expose scaffold Tauri invoke commands that prove Rust-to-frontend wiring without implementing unspecified product flows.
-
-#### Scenario: Ping command
-
-- **WHEN** the frontend invokes the `ping` command
-- **THEN** the backend returns a non-empty fixed string
-- **AND** no knowledge base mutation occurs
-
-#### Scenario: Root id command
-
-- **WHEN** the frontend invokes the `root_id` command and the session has a persisted root block
-- **THEN** the backend returns the root block UUID as a string
-- **AND** the value matches `Session::root_id()` from the in-process session
-
-#### Scenario: Root id before root exists
-
-- **WHEN** the frontend invokes `root_id` and the session has no root block version record yet
-- **THEN** the command fails with an error derived from `CoreError` without friendly rewriting
-
-### Requirement: No unspecified save policy
-
-The desktop shell MUST NOT invoke `Session::save` on a timer, on mutation, or on window close. The shell MAY expose a single explicit Save control (a button or invoke command) that calls `Session::save` only when the user invokes it. No automatic or implicit save trigger is permitted.
-
-#### Scenario: Window close without save
-
-- **WHEN** the user closes the Tauri window
-- **THEN** the process exits without an automatic save-on-close step
-
-#### Scenario: Explicit save only
-
-- **WHEN** the user changes a block property in the Properties View
-- **THEN** the change is held in memory and is not persisted to disk
-- **AND** it is written only when the user invokes the explicit Save control calling `Session::save`
+## MODIFIED Requirements
 
 ### Requirement: Anti-default UI shell
 
@@ -166,20 +109,3 @@ The desktop shell MUST expose Tauri invoke commands sufficient for the desktop U
 
 - **WHEN** the frontend invokes the save command
 - **THEN** the backend calls `Session::save`
-
-### Requirement: Desktop open policy (interim)
-
-Until a storage-engine capability with autosave is specified, when `AppState` is opened at a path where no knowledge base file exists, the desktop adapter MUST automatically save the session so the root block is materialized before any frontend calls are served. After `open_at` returns successfully, `root_id()` MUST succeed. This policy is adapter-specific and MUST NOT be assumed by **`session`**, **`cli`**, or future REPL mode.
-
-#### Scenario: First launch creates root block
-
-- **WHEN** `AppState::open_at` is called with a path that does not exist on disk
-- **THEN** `open_at` saves the session automatically
-- **AND** `root_id()` returns a valid UUID immediately after `open_at` returns
-
-#### Scenario: Existing knowledge base is not re-saved on open
-
-- **WHEN** `AppState::open_at` is called with a path to an existing knowledge base file
-- **THEN** no additional save is performed during `open_at`
-- **AND** the file on disk is not modified by the open operation alone
-

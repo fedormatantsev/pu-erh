@@ -1,4 +1,10 @@
-## ADDED Requirements
+# ui-direction Specification
+
+## Purpose
+
+Visual design principles for pu-erh UI: content-first layout, spacing and typography over borders, font roles, progressive disclosure, and information density limits.
+
+## Requirements
 
 ### Requirement: Content occupies the primary visual field
 The UI SHALL be content-centric: the content area fills the available width and visual weight. Structural chrome (navigation, toolbars, sidebars) SHALL be visually subordinate — low contrast, compact, and absent when not needed. No element of chrome SHALL compete with content for the user's primary attention.

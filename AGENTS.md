@@ -50,3 +50,6 @@ CLI / Desktop / App  →  core::Session  →  graph + storage
 
 - UI and Desktop changes MUST respect `agent-anti-default`.
 - Before implementing unspecified interaction, read the active change’s specs and tasks — do not extend scope.
+- Capability index and reading order: [`openspec/CAPABILITIES.md`](openspec/CAPABILITIES.md).
+- Desktop UI specs: `desktop-shell-ui`, `tree-view`, `properties-view`, `document-view`, `action-bar`, `property-registry`.
+- Cross-reference other capabilities normatively: `**capability-name**`, Requirement: **Exact heading** (see `agent-anti-default`, Requirement: **Normative cross-reference convention**).

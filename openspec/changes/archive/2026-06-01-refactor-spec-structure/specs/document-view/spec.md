@@ -1,9 +1,5 @@
-# document-view Specification
+## MODIFIED Requirements
 
-## Purpose
-
-Defines the Document View renderer (`display=document`): primary-only registration, editable title heading, ordered child paragraphs with rich-text editing, and structural edits mapped to Session mutations.
-## Requirements
 ### Requirement: Structured Document View is a registered Block View renderer
 
 The Document View MUST register renderer `document` with the **`desktop-shell-ui`** renderer registry as **primary-only** (inline not supported). When the current selected block's `display` is `document`, the primary surface MUST render the Document View. The key `document` MUST appear in the registry so the Properties View `display` dropdown per **`properties-view`** offers it. The Document View MUST coordinate Session only per **`agent-anti-default`**, Requirement: **UI adapters coordinate Session only**.
@@ -143,3 +139,10 @@ Presentational Document View building blocks MUST live in the design-system pack
 - **THEN** it reads and mutates state through `core::Session` in the application adapter layer
 - **AND** it does not reimplement domain logic in the design-system package
 
+## REMOVED Requirements
+
+### Requirement: Document View save policy
+
+**Reason**: Consolidated into **`agent-anti-default`**, Requirement: **In-memory mutation with adapter-defined persistence**, and **`desktop-shell`** explicit Save policy.
+
+**Migration**: Reference those capabilities instead of duplicating save rules in **`document-view`**.

@@ -15,6 +15,11 @@ context: |
   Block IDs: UUID (v4 for v0)
   Domain: blocks, sessions, knowledge bases, queries, mutations
 
+  OpenSpec index: openspec/CAPABILITIES.md (reading order and layer map).
+  Desktop UI capabilities: desktop-shell-ui, tree-view, properties-view,
+  document-view, action-bar, property-registry. Cross-reference other
+  capabilities as: **capability-name**, Requirement: **Name**.
+
   Agent policy (anti-default): Read AGENTS.md before UI or Desktop work. Do not invent
   product UX (navigation, save policy, shortcuts, welcome copy, selection model) when
   specs or tasks are silent — stub, disable, or escalate. Infrastructure-only defaults
