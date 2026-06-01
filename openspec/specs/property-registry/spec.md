@@ -42,7 +42,7 @@ Canonical domain semantics for reserved block and edge property keys (`title`, `
 
 ### Requirement: body property
 
-`body` MUST be a reserved block property key whose value, when present, MUST be a `PropertyValue::String` holding a block's serialized rich-text editor state as produced and consumed by the Document View per **`document-view`**. Because its value is an opaque serialized payload, `body` MUST be excluded from generic user-editable property lists per **`properties-view`**. Writes MUST go through `set_property` per **`mutations`**.
+`body` MUST be a reserved block property key whose value, when present, MUST be a `PropertyValue::String` holding a block's serialized rich-text editor state as produced and consumed by the Document View per **`document-view`**. Writes MUST go through `set_property` per **`mutations`**. The `body` key MUST NOT carry a dedicated layout slot in any user-facing surface; visibility in introspection surfaces such as the Properties View is governed by **`properties-view`**, Requirement: **Well-known property layout slots**, not by this registry.
 
 #### Scenario: body holds serialized rich text
 
@@ -53,6 +53,12 @@ Canonical domain semantics for reserved block and edge property keys (`title`, `
 
 - **WHEN** the Document View changes paragraph content
 - **THEN** the change is applied through `core::Session::set_property` with key `body`
+
+#### Scenario: body has no dedicated layout slot in the Properties View
+
+- **WHEN** the Properties View is shown for a block carrying a `body` property
+- **THEN** `body` MUST NOT occupy a dedicated layout slot
+- **AND** `body` appears in the generic properties list per **`properties-view`**, Scenario: **Generic list excludes only dedicated-slot keys**
 
 ### Requirement: Well-known edge property registry
 

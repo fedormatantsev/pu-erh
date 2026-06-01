@@ -5,10 +5,10 @@ import { Button, PropertiesPanel, Stack, Text } from "@pu-erh/ui";
 import { getBlock, removeProperty, save, setProperty } from "../ipc";
 import { BLOCK_VIEW_NAMES } from "./blockView";
 
-const RESERVED_KEYS = ["title", "display", "body"] as const;
-type ReservedKey = (typeof RESERVED_KEYS)[number];
-function isReserved(key: string): key is ReservedKey {
-  return (RESERVED_KEYS as readonly string[]).includes(key);
+const SLOT_KEYS = ["title", "display"] as const;
+type SlotKey = (typeof SLOT_KEYS)[number];
+function isSlotKey(key: string): key is SlotKey {
+  return (SLOT_KEYS as readonly string[]).includes(key);
 }
 
 export function PropertiesView({ blockId }: { blockId: string }) {
@@ -17,7 +17,7 @@ export function PropertiesView({ blockId }: { blockId: string }) {
   const needsWrite = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
-  // User properties: all keys not in RESERVED_KEYS.
+  // Generic properties: every property whose key is not a dedicated slot.
   const [userProps, setUserProps] = useState<Record<string, string>>({});
 
   // Add-property form state.
@@ -43,7 +43,7 @@ export function PropertiesView({ blockId }: { blockId: string }) {
         // Collect user properties (non-reserved string and non-string values shown as strings).
         const user: Record<string, string> = {};
         for (const [k, v] of Object.entries(block.properties)) {
-          if (!isReserved(k)) {
+          if (!isSlotKey(k)) {
             user[k] = v == null ? "" : String(v);
           }
         }
@@ -91,8 +91,8 @@ export function PropertiesView({ blockId }: { blockId: string }) {
       setAddError("Key must not be empty.");
       return;
     }
-    if (isReserved(trimmedKey)) {
-      setAddError(`"${trimmedKey}" is a reserved key.`);
+    if (isSlotKey(trimmedKey)) {
+      setAddError(`"${trimmedKey}" has a dedicated slot.`);
       return;
     }
     setAddError(null);
