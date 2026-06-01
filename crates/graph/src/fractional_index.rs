@@ -1,8 +1,5 @@
 use thiserror::Error;
 
-const SMALLEST_INT: &str = "A00000000000000000000000000";
-const LARGEST_INT: &str = "zzzzzzzzzzzzzzzzzzzzzzzzzzz";
-
 #[derive(Debug, Error, PartialEq)]
 pub enum OrderError {
     #[error("invalid fractional index: {0:?}")]
@@ -145,7 +142,7 @@ fn midpoint(l: &str, r: &str) -> String {
             if i == max_len - 1 {
                 // Exhausted, append midpoint in next position
                 let l_next = 0u8;
-                let r_next = if ldig < rdig { BASE } else { BASE };
+                let r_next = BASE;
                 result.push(digit_to_char(l_next + (r_next) / 2));
                 break;
             }

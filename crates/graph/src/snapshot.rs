@@ -2,7 +2,6 @@ use std::collections::HashSet;
 
 use uuid::Uuid;
 
-use crate::fractional_index::generate_key_between;
 use crate::model::{Block, Edge, EdgeType, GraphError, PositionHint, Properties};
 use crate::property_value::PropertyValue;
 use crate::radix_trie::{DiffKind, RadixTrieMap, TrieDiffEntry};
