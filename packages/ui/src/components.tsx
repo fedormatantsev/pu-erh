@@ -155,6 +155,104 @@ export function PropertiesPanel({ children }: PropertiesPanelProps) {
   return <section className="pu-erh-properties-panel">{children}</section>;
 }
 
+// Presentational Structured Document View building blocks. Session-agnostic:
+// they receive content and callbacks as props and never call IPC/Tauri APIs or
+// assume a current selected block. The rich-text editor itself (Lexical) is
+// composed in the application adapter and mounted inside DocumentBody.
+
+type DocumentSurfaceProps = {
+  children: ReactNode;
+};
+
+export function DocumentSurface({ children }: DocumentSurfaceProps) {
+  return <article className="pu-erh-document">{children}</article>;
+}
+
+// Editable plain-text heading bound to the document block's `title`. Plain text
+// only — no rich-text marks. Empty when the title is absent (no placeholder
+// copy). Submitting (Enter) blurs rather than inserting a newline.
+type DocumentHeadingProps = {
+  value: string;
+  onChange: (value: string) => void;
+  ariaLabel?: string;
+};
+
+export function DocumentHeading({ value, onChange, ariaLabel }: DocumentHeadingProps) {
+  return (
+    <input
+      className="pu-erh-document-heading"
+      type="text"
+      value={value}
+      aria-label={ariaLabel}
+      onChange={(event) => onChange(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          event.currentTarget.blur();
+        }
+      }}
+    />
+  );
+}
+
+// The seven supported rich-text formats for paragraphs — fixed set, no others.
+export type DocumentFormat =
+  | "bold"
+  | "italic"
+  | "underline"
+  | "strikethrough"
+  | "code"
+  | "link"
+  | "quote";
+
+const DOCUMENT_FORMATS: { format: DocumentFormat; label: string }[] = [
+  { format: "bold", label: "B" },
+  { format: "italic", label: "I" },
+  { format: "underline", label: "U" },
+  { format: "strikethrough", label: "S" },
+  { format: "code", label: "Code" },
+  { format: "link", label: "Link" },
+  { format: "quote", label: "Quote" },
+];
+
+// Presentational formatting toolbar exposing exactly the supported formats.
+// Active marks are reflected via aria-pressed; toggling delegates to the adapter.
+type FormatToolbarProps = {
+  active: Partial<Record<DocumentFormat, boolean>>;
+  onToggle: (format: DocumentFormat) => void;
+  isDisabled?: boolean;
+};
+
+export function FormatToolbar({ active, onToggle, isDisabled }: FormatToolbarProps) {
+  return (
+    <div className="pu-erh-format-toolbar" role="toolbar" aria-label="Formatting">
+      {DOCUMENT_FORMATS.map(({ format, label }) => (
+        <AriaButton
+          key={format}
+          className="pu-erh-format-button"
+          type="button"
+          isDisabled={isDisabled}
+          aria-pressed={active[format] ?? false}
+          aria-label={format}
+          onPress={() => onToggle(format)}
+        >
+          {label}
+        </AriaButton>
+      ))}
+    </div>
+  );
+}
+
+// Styled container that hosts the Lexical content-editable surface (passed as
+// children by the adapter).
+type DocumentBodyProps = {
+  children: ReactNode;
+};
+
+export function DocumentBody({ children }: DocumentBodyProps) {
+  return <div className="pu-erh-document-body">{children}</div>;
+}
+
 // The action bar overlay: a compact floating panel of view-provided actions.
 // Session-agnostic — it receives an ordered list of action descriptors as props
 // and never reads shell state or calls IPC.

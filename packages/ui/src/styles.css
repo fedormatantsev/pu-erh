@@ -145,6 +145,121 @@
   gap: var(--space-2);
 }
 
+/* Structured Document View: a centered reading column with an editable heading,
+   a formatting toolbar, and a rich-text body. The body's contentEditable inherits
+   prose styling; the supported marks render with quiet, conventional emphasis. */
+.pu-erh-document {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 42rem;
+  margin: 0 auto;
+}
+
+.pu-erh-document-heading {
+  font-family: var(--font-sans);
+  font-size: var(--text-2xl, 1.75rem);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  color: var(--color-text);
+  border: none;
+  background: transparent;
+  outline: none;
+  padding: 0;
+}
+
+.pu-erh-format-toolbar {
+  display: flex;
+  gap: var(--space-1);
+  position: sticky;
+  top: 0;
+}
+
+.pu-erh-format-button {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  min-width: var(--space-8);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  outline: none;
+}
+
+.pu-erh-format-button[data-focused] {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+.pu-erh-format-button[data-disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pu-erh-format-button[aria-pressed="true"] {
+  background: var(--color-neutral-100);
+  border-color: var(--color-primary-500);
+}
+
+.pu-erh-document-body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-base);
+  color: var(--color-text);
+}
+
+.pu-erh-document-body [contenteditable] {
+  outline: none;
+}
+
+.pu-erh-document-body p {
+  margin: 0 0 var(--space-2);
+}
+
+.pu-erh-document-body blockquote {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.pu-erh-document-body a {
+  color: var(--color-primary-500);
+  text-decoration: underline;
+}
+
+.pu-erh-doc-bold {
+  font-weight: var(--weight-semibold);
+}
+
+.pu-erh-doc-italic {
+  font-style: italic;
+}
+
+.pu-erh-doc-underline {
+  text-decoration: underline;
+}
+
+.pu-erh-doc-strikethrough {
+  text-decoration: line-through;
+}
+
+.pu-erh-doc-underline.pu-erh-doc-strikethrough {
+  text-decoration: underline line-through;
+}
+
+.pu-erh-doc-code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 0 var(--space-1);
+  background: var(--color-neutral-100);
+  border-radius: var(--radius-sm);
+}
+
 .pu-erh-badge {
   display: inline-flex;
   align-items: center;

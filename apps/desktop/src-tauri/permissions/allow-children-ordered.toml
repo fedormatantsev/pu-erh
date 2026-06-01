@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-children-ordered"
+description = "Enables the children_ordered command"
+commands.allow = ["children_ordered"]

@@ -27,6 +27,11 @@ pub fn children(state: State<AppState>, id: String) -> Result<Vec<BlockDto>, Str
 }
 
 #[tauri::command]
+pub fn children_ordered(state: State<AppState>, id: String) -> Result<Vec<BlockDto>, String> {
+    state.children_ordered(&id)
+}
+
+#[tauri::command]
 pub fn set_property(
     state: State<AppState>,
     id: String,
@@ -37,8 +42,26 @@ pub fn set_property(
 }
 
 #[tauri::command]
-pub fn create_block(state: State<AppState>, parent: String) -> Result<String, String> {
-    state.create_block(&parent)
+pub fn create_block(
+    state: State<AppState>,
+    parent: String,
+    after: Option<String>,
+) -> Result<String, String> {
+    state.create_block(&parent, after.as_deref())
+}
+
+#[tauri::command]
+pub fn delete_block(state: State<AppState>, id: String) -> Result<(), String> {
+    state.delete_block(&id)
+}
+
+#[tauri::command]
+pub fn move_block(
+    state: State<AppState>,
+    id: String,
+    after: Option<String>,
+) -> Result<(), String> {
+    state.move_block(&id, after.as_deref())
 }
 
 #[tauri::command]

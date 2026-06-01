@@ -4,6 +4,10 @@ export {
   Button,
   Card,
   Divider,
+  DocumentBody,
+  DocumentHeading,
+  DocumentSurface,
+  FormatToolbar,
   InlineBlock,
   PropertiesPanel,
   Stack,
@@ -13,3 +17,4 @@ export {
   TreeColumns,
   ViewModeToggle,
 } from "./components";
+export type { DocumentFormat } from "./components";

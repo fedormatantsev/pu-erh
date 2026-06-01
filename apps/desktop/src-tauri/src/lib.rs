@@ -1,6 +1,9 @@
 mod commands;
 
-use commands::{block, children, create_block, parent, ping, root_id, save, set_property};
+use commands::{
+    block, children, children_ordered, create_block, delete_block, move_block, parent, ping,
+    root_id, save, set_property,
+};
 use desktop::AppState;
 use tauri::Manager;
 
@@ -26,7 +29,10 @@ pub fn run() {
             block,
             parent,
             children,
+            children_ordered,
             create_block,
+            delete_block,
+            move_block,
             set_property,
             save
         ])

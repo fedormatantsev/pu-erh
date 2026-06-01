@@ -11,6 +11,7 @@ import { Text, TreeCell, TreeColumn, TreeColumns } from "@pu-erh/ui";
 import { getBlock, getChildren, getParent } from "../ipc";
 import { useShell } from "../shell";
 import type { BlockDto, PropertyValue } from "../types";
+import { DocumentView } from "./documentView";
 import { resolveInlineView } from "./inlineView";
 
 // A primary renderer represents the current selected block as the main Block
@@ -137,6 +138,7 @@ export function DefaultBlockView({ blockId }: { blockId: string }) {
 
 const blockRenderers: Record<string, BlockView> = {
   tree: DefaultBlockView,
+  document: DocumentView,
 };
 
 export const BLOCK_VIEW_NAMES: string[] = Object.keys(blockRenderers);
@@ -155,4 +157,42 @@ export function resolveBlockView(display: PropertyValue | undefined): BlockResol
     return { View: DefaultBlockView, unrecognized: display };
   }
   return { View: DefaultBlockView, unrecognized: null };
+}
+
+// The primary Block View for the current selected block: reads the block's
+// `display` property and dispatches to the matching registered renderer
+// (defaulting to the TreeView when absent or unrecognized). This is the router
+// entry point used by the View Router for block mode.
+export function PrimaryBlockView({ blockId }: { blockId: string }) {
+  const [display, setDisplay] = useState<PropertyValue | undefined>(undefined);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoaded(false);
+    setError(null);
+    getBlock(blockId).then(
+      (block) => {
+        if (cancelled) return;
+        setDisplay(block.properties.display);
+        setLoaded(true);
+      },
+      (err) => {
+        if (!cancelled) setError(String(err));
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [blockId]);
+
+  if (error) {
+    return <Text>{error}</Text>;
+  }
+  if (!loaded) {
+    return <></>;
+  }
+  const { View } = resolveBlockView(display);
+  return <View blockId={blockId} />;
 }

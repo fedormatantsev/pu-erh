@@ -10,7 +10,10 @@
     "allow-block",
     "allow-parent",
     "allow-children",
+    "allow-children-ordered",
     "allow-create-block",
+    "allow-delete-block",
+    "allow-move-block",
     "allow-set-property",
     "allow-save"
   ]

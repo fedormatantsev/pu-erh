@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 
-import { DefaultBlockView } from "./views/blockView";
+import { PrimaryBlockView } from "./views/blockView";
 import { PropertiesView } from "./views/PropertiesView";
 import type { ActionBarAction, ViewMode } from "./types";
 
@@ -21,7 +21,7 @@ export function viewRouter(
 ): ViewDescriptor {
   if (mode === "block") {
     return {
-      View: DefaultBlockView,
+      View: PrimaryBlockView,
       actions: ({ setViewMode, createChild, canCreateChild }) => [
         {
           id: "toggle",

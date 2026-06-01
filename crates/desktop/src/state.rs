@@ -95,6 +95,27 @@ impl AppState {
             .collect())
     }
 
+    /// Like `children`, but returns the children sorted by the `child-ordering`
+    /// `order` property. The unordered `children` command/`children:` query does
+    /// not expose edge order to the frontend, so views that render children in
+    /// document order (the Document View) use this command.
+    pub fn children_ordered(&self, id: &str) -> Result<Vec<BlockDto>, String> {
+        let parent = parse_uuid(id)?;
+        let session = self.session.lock().map_err(|err| err.to_string())?;
+        let kb = session.knowledge_base();
+        if kb.block(parent).is_none() {
+            return Err(CoreError::from(GraphError::BlockNotFound(parent)).to_string());
+        }
+        Ok(kb
+            .children_ordered(parent)
+            .into_iter()
+            .filter_map(|child_id| {
+                kb.block(child_id)
+                    .map(|block| BlockDto::new(block, kb.has_children(child_id)))
+            })
+            .collect())
+    }
+
     pub fn set_property(&self, id: &str, key: String, value: PropertyValue) -> Result<(), String> {
         let id = parse_uuid(id)?;
         let mut session = self.session.lock().map_err(|err| err.to_string())?;
@@ -102,13 +123,48 @@ impl AppState {
     }
 
     /// Creates a new child of `parent` through the session and returns the new
-    /// block id. The append is held in memory; no save occurs here.
-    pub fn create_block(&self, parent: &str) -> Result<String, String> {
+    /// block id. When `after` is a sibling id the child is placed immediately
+    /// after it; otherwise it is appended last. The change is held in memory; no
+    /// save occurs here.
+    pub fn create_block(&self, parent: &str, after: Option<&str>) -> Result<String, String> {
         let parent = parse_uuid(parent)?;
+        let position = match after {
+            Some(sibling) => PositionHint::After(parse_uuid(sibling)?),
+            None => PositionHint::Last,
+        };
         let mut session = self.session.lock().map_err(|err| err.to_string())?;
         session
-            .create_block(Some(parent), PositionHint::Last)
+            .create_block(Some(parent), position)
             .map(|id| id.to_string())
+            .map_err(|err| err.to_string())
+    }
+
+    /// Deletes a block through the session. Held in memory; no save occurs here.
+    pub fn delete_block(&self, id: &str) -> Result<(), String> {
+        let id = parse_uuid(id)?;
+        let mut session = self.session.lock().map_err(|err| err.to_string())?;
+        session.delete_block(id).map_err(|err| err.to_string())
+    }
+
+    /// Moves a block among its existing siblings. The block keeps its current
+    /// parent; `after` is the sibling it should follow, or `None` to move it
+    /// first. Held in memory; no save occurs here.
+    pub fn move_block(&self, id: &str, after: Option<&str>) -> Result<(), String> {
+        let id = parse_uuid(id)?;
+        let after = after.map(parse_uuid).transpose()?;
+        let mut session = self.session.lock().map_err(|err| err.to_string())?;
+        let parent = session
+            .query(&format!("parent:{id}"))
+            .map_err(|err| err.to_string())?
+            .into_iter()
+            .next()
+            .map(|block| block.id);
+        let position = match after {
+            Some(sibling) => PositionHint::After(sibling),
+            None => PositionHint::First,
+        };
+        session
+            .move_block(id, parent, position)
             .map_err(|err| err.to_string())
     }
 
@@ -240,7 +296,7 @@ mod tests {
     #[test]
     fn create_block_appends_child_visible_in_children() {
         let (state, root, _dir) = state_with_root();
-        let child = state.create_block(&root).expect("create child");
+        let child = state.create_block(&root, None).expect("create child");
 
         let children = state.children(&root).expect("children");
         assert_eq!(children.len(), 1);
@@ -251,7 +307,7 @@ mod tests {
     fn create_block_nonexistent_parent_surfaces_error() {
         let (state, _root, _dir) = state_with_root();
         let missing = uuid::Uuid::new_v4().to_string();
-        let err = state.create_block(&missing).unwrap_err();
+        let err = state.create_block(&missing, None).unwrap_err();
         assert!(!err.is_empty(), "expected a CoreError-derived message");
     }
 
@@ -261,5 +317,74 @@ mod tests {
         let missing = uuid::Uuid::new_v4().to_string();
         let err = state.block(&missing).unwrap_err();
         assert!(err.contains("block not found"), "got: {err}");
+    }
+
+    #[test]
+    fn create_block_after_sibling_inserts_between() {
+        let (state, root, _dir) = state_with_root();
+        let first = state.create_block(&root, None).expect("first");
+        let last = state.create_block(&root, None).expect("last");
+        // Insert immediately after `first`, between `first` and `last`.
+        let middle = state.create_block(&root, Some(&first)).expect("middle");
+
+        let order: Vec<String> = state
+            .children_ordered(&root)
+            .expect("children")
+            .into_iter()
+            .map(|block| block.id)
+            .collect();
+        assert_eq!(order, vec![first, middle, last]);
+    }
+
+    #[test]
+    fn delete_block_removes_child() {
+        let (state, root, _dir) = state_with_root();
+        let child = state.create_block(&root, None).expect("create");
+        state.delete_block(&child).expect("delete");
+        assert!(state.children(&root).expect("children").is_empty());
+    }
+
+    #[test]
+    fn move_block_reorders_among_siblings() {
+        let (state, root, _dir) = state_with_root();
+        let a = state.create_block(&root, None).expect("a");
+        let b = state.create_block(&root, None).expect("b");
+        let c = state.create_block(&root, None).expect("c");
+
+        // Move `c` to the front (no `after` sibling).
+        state.move_block(&c, None).expect("move c first");
+        let order: Vec<String> = state
+            .children_ordered(&root)
+            .expect("children")
+            .into_iter()
+            .map(|block| block.id)
+            .collect();
+        assert_eq!(order, vec![c.clone(), a.clone(), b.clone()]);
+
+        // Move `c` to immediately after `a`.
+        state.move_block(&c, Some(&a)).expect("move c after a");
+        let order: Vec<String> = state
+            .children_ordered(&root)
+            .expect("children")
+            .into_iter()
+            .map(|block| block.id)
+            .collect();
+        assert_eq!(order, vec![a, c, b]);
+    }
+
+    #[test]
+    fn children_ordered_missing_surfaces_error() {
+        let (state, _root, _dir) = state_with_root();
+        let missing = uuid::Uuid::new_v4().to_string();
+        let err = state.children_ordered(&missing).unwrap_err();
+        assert!(err.contains("block not found"), "got: {err}");
+    }
+
+    #[test]
+    fn delete_block_nonexistent_surfaces_error() {
+        let (state, _root, _dir) = state_with_root();
+        let missing = uuid::Uuid::new_v4().to_string();
+        let err = state.delete_block(&missing).unwrap_err();
+        assert!(!err.is_empty(), "expected a CoreError-derived message");
     }
 }

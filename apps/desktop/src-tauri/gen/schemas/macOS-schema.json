@@ -189,10 +189,28 @@
           "markdownDescription": "Enables the children command"
         },
         {
+          "description": "Enables the children_ordered command",
+          "type": "string",
+          "const": "allow-children-ordered",
+          "markdownDescription": "Enables the children_ordered command"
+        },
+        {
           "description": "Enables the create_block command",
           "type": "string",
           "const": "allow-create-block",
           "markdownDescription": "Enables the create_block command"
+        },
+        {
+          "description": "Enables the delete_block command",
+          "type": "string",
+          "const": "allow-delete-block",
+          "markdownDescription": "Enables the delete_block command"
+        },
+        {
+          "description": "Enables the move_block command",
+          "type": "string",
+          "const": "allow-move-block",
+          "markdownDescription": "Enables the move_block command"
         },
         {
           "description": "Enables the parent command",

@@ -9,6 +9,13 @@ import { BLOCK_VIEW_NAMES } from "./blockView";
 // each have a dedicated slot rendered before any generic property list.
 // `display` absent or unrecognized values resolve to the default view name and
 // are written to storage on the next save.
+//
+// `body` is a reserved property (serialized rich text owned by the Document
+// View); like other reserved keys it is never surfaced as a generic, editable
+// property item. This view renders no generic properties list yet, so reserved
+// keys are inherently excluded; any future generic list MUST skip RESERVED_KEYS.
+const RESERVED_KEYS = ["title", "display", "body"] as const;
+void RESERVED_KEYS;
 export function PropertiesView({ blockId }: { blockId: string }) {
   const [title, setTitle] = useState("");
   const [display, setDisplay] = useState(BLOCK_VIEW_NAMES[0]);

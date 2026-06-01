@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-move-block"
+description = "Enables the move_block command"
+commands.allow = ["move_block"]

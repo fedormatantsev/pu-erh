@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-delete-block"
+description = "Enables the delete_block command"
+commands.allow = ["delete_block"]

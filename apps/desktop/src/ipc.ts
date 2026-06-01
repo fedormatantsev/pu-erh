@@ -25,6 +25,12 @@ export function getChildren(id: string): Promise<BlockDto[]> {
   return invoke<BlockDto[]>("children", { id });
 }
 
+// Children in child-ordering order (sorted by the edge `order` property), which
+// the unordered `children` command does not expose.
+export function getChildrenOrdered(id: string): Promise<BlockDto[]> {
+  return invoke<BlockDto[]>("children_ordered", { id });
+}
+
 export function setProperty(
   id: string,
   key: string,
@@ -33,8 +39,20 @@ export function setProperty(
   return invoke<void>("set_property", { id, key, value });
 }
 
-export function createBlock(parent: string): Promise<string> {
-  return invoke<string>("create_block", { parent });
+// Creates a child of `parent`. When `after` is a sibling id the child is placed
+// immediately after it; otherwise it is appended last.
+export function createBlock(parent: string, after?: string): Promise<string> {
+  return invoke<string>("create_block", { parent, after: after ?? null });
+}
+
+export function deleteBlock(id: string): Promise<void> {
+  return invoke<void>("delete_block", { id });
+}
+
+// Reorders a block among its existing siblings. `after` is the sibling it should
+// follow, or omitted/null to move it first.
+export function moveBlock(id: string, after?: string): Promise<void> {
+  return invoke<void>("move_block", { id, after: after ?? null });
 }
 
 export function save(): Promise<void> {
