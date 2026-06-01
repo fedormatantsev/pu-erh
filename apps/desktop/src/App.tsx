@@ -2,10 +2,12 @@ import { ActionBar, Stack, Text } from "@pu-erh/ui";
 
 import { ShellProvider, useShell } from "./shell";
 import { viewRouter } from "./viewRouter";
+import type { ActionBarAction } from "./types";
 
 // Exactly one view is shown at a time, chosen by the View Router as a function
-// of (currentBlockId, viewMode). The action bar overlay renders the actions
-// declared by the active view.
+// of (currentBlockId, viewMode). The action bar overlay renders shell-level
+// navigation actions (backward, forward) followed by the actions declared by
+// the active view.
 function Workspace() {
   const {
     currentBlockId,
@@ -14,6 +16,10 @@ function Workspace() {
     viewMode,
     setViewMode,
     createChild,
+    navigateBack,
+    navigateForward,
+    canGoBack,
+    canGoForward,
   } = useShell();
 
   if (rootError) {
@@ -29,15 +35,30 @@ function Workspace() {
   }
 
   const { View, actions } = viewRouter(currentBlockId, viewMode);
-  const actionList = actions({
+  const viewActions = actions({
     setViewMode,
     createChild,
     canCreateChild: true,
   });
 
+  const navActions: ActionBarAction[] = [
+    {
+      id: "nav-back",
+      label: "←",
+      onPress: navigateBack,
+      isDisabled: !canGoBack,
+    },
+    {
+      id: "nav-forward",
+      label: "→",
+      onPress: navigateForward,
+      isDisabled: !canGoForward,
+    },
+  ];
+
   return (
     <Stack>
-      <ActionBar actions={actionList} />
+      <ActionBar actions={[...navActions, ...viewActions]} />
       {actionError ? <Text>{actionError}</Text> : null}
       <View blockId={currentBlockId} />
     </Stack>

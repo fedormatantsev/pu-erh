@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useReducer,
   useState,
   type ReactNode,
 } from "react";
@@ -11,11 +12,65 @@ import {
 import { createBlock, rootId } from "./ipc";
 import type { ViewMode } from "./types";
 
-// All Block View state lives in the shell: the current selected block and the
-// active view mode. The TreeView derives its columns (parent, siblings,
-// children) from the current selected block, so no per-node expand/collapse
-// state is held. Presentational components receive state via props/callbacks
-// and never read it themselves.
+// All Block View state lives in the shell: the current selected block, the
+// active view mode, and the navigation history stacks. Presentational
+// components receive state via props/callbacks and never read it themselves.
+
+// Navigation state is managed by a pure reducer so all transitions are atomic
+// and safe under React StrictMode's double-invocation of updaters.
+type NavState = {
+  currentBlockId: string | null;
+  backStack: string[];
+  forwardStack: string[];
+};
+
+type NavAction =
+  | { type: "init"; id: string }
+  | { type: "select"; id: string }
+  | { type: "back" }
+  | { type: "forward" };
+
+function navReducer(state: NavState, action: NavAction): NavState {
+  switch (action.type) {
+    case "init":
+      // Root resolution on open — no history entry created.
+      return { currentBlockId: action.id, backStack: [], forwardStack: [] };
+    case "select": {
+      if (state.currentBlockId === null) {
+        return { ...state, currentBlockId: action.id };
+      }
+      return {
+        currentBlockId: action.id,
+        backStack: [...state.backStack, state.currentBlockId],
+        forwardStack: [],
+      };
+    }
+    case "back": {
+      if (state.backStack.length === 0) return state;
+      const target = state.backStack[state.backStack.length - 1];
+      return {
+        currentBlockId: target,
+        backStack: state.backStack.slice(0, -1),
+        forwardStack:
+          state.currentBlockId !== null
+            ? [state.currentBlockId, ...state.forwardStack]
+            : state.forwardStack,
+      };
+    }
+    case "forward": {
+      if (state.forwardStack.length === 0) return state;
+      const target = state.forwardStack[0];
+      return {
+        currentBlockId: target,
+        backStack:
+          state.currentBlockId !== null
+            ? [...state.backStack, state.currentBlockId]
+            : state.backStack,
+        forwardStack: state.forwardStack.slice(1),
+      };
+    }
+  }
+}
 
 type ShellState = {
   currentBlockId: string | null;
@@ -25,7 +80,11 @@ type ShellState = {
   // Bumped after a successful mutation so views derived from the current block
   // (e.g. the children column) re-read without changing the selection.
   refreshToken: number;
+  canGoBack: boolean;
+  canGoForward: boolean;
   selectBlock: (id: string) => void;
+  navigateBack: () => void;
+  navigateForward: () => void;
   setViewMode: (mode: ViewMode) => void;
   createChild: () => void;
 };
@@ -33,19 +92,23 @@ type ShellState = {
 const ShellContext = createContext<ShellState | null>(null);
 
 export function ShellProvider({ children }: { children: ReactNode }) {
-  const [currentBlockId, setCurrentBlockId] = useState<string | null>(null);
+  const [nav, dispatch] = useReducer(navReducer, {
+    currentBlockId: null,
+    backStack: [],
+    forwardStack: [],
+  });
   const [rootError, setRootError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("block");
   const [refreshToken, setRefreshToken] = useState(0);
 
-  // The current selected block resolves to the root block on open. A fresh,
-  // never-saved knowledge base has no root and root_id errors; surface it.
+  // The current selected block resolves to the root block on open. Uses the
+  // "init" action so the root resolution does not create a history entry.
   useEffect(() => {
     let cancelled = false;
     rootId().then(
       (id) => {
-        if (!cancelled) setCurrentBlockId(id);
+        if (!cancelled) dispatch({ type: "init", id });
       },
       (error) => {
         if (!cancelled) setRootError(String(error));
@@ -57,7 +120,15 @@ export function ShellProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const selectBlock = useCallback((id: string) => {
-    setCurrentBlockId(id);
+    dispatch({ type: "select", id });
+  }, []);
+
+  const navigateBack = useCallback(() => {
+    dispatch({ type: "back" });
+  }, []);
+
+  const navigateForward = useCallback(() => {
+    dispatch({ type: "forward" });
   }, []);
 
   // Append a child of the current selected block. This does not change the
@@ -65,32 +136,38 @@ export function ShellProvider({ children }: { children: ReactNode }) {
   // policy); on success the refresh token is bumped so the children column
   // re-reads. Mutation errors are surfaced as the CoreError-derived value.
   const createChild = useCallback(() => {
-    if (!currentBlockId) return;
+    if (!nav.currentBlockId) return;
     setActionError(null);
-    createBlock(currentBlockId).then(
+    createBlock(nav.currentBlockId).then(
       () => setRefreshToken((n) => n + 1),
       (error) => setActionError(String(error)),
     );
-  }, [currentBlockId]);
+  }, [nav.currentBlockId]);
 
   const value = useMemo<ShellState>(
     () => ({
-      currentBlockId,
+      currentBlockId: nav.currentBlockId,
       rootError,
       actionError,
       viewMode,
       refreshToken,
+      canGoBack: nav.backStack.length > 0,
+      canGoForward: nav.forwardStack.length > 0,
       selectBlock,
+      navigateBack,
+      navigateForward,
       setViewMode,
       createChild,
     }),
     [
-      currentBlockId,
+      nav,
       rootError,
       actionError,
       viewMode,
       refreshToken,
       selectBlock,
+      navigateBack,
+      navigateForward,
       createChild,
     ],
   );
