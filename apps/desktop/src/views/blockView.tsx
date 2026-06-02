@@ -126,11 +126,11 @@ export function DefaultBlockView({ blockId }: { blockId: string }) {
       onKeyDown={onKeyDown}
     >
       <TreeColumns>
-        <TreeColumn>{parent ? cell(parent, false) : null}</TreeColumn>
-        <TreeColumn>
+        <TreeColumn label="parent">{parent ? cell(parent, false) : null}</TreeColumn>
+        <TreeColumn label="current · siblings">
           {siblings.map((block) => cell(block, block.id === blockId))}
         </TreeColumn>
-        <TreeColumn>{children.map((block) => cell(block, false))}</TreeColumn>
+        <TreeColumn label="children">{children.map((block) => cell(block, false))}</TreeColumn>
       </TreeColumns>
     </div>
   );

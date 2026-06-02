@@ -69,11 +69,17 @@ export function Button({ children, onPress, isDisabled, type = "button" }: Butto
 type InlineBlockProps = {
   label: ReactNode;
   onActivate?: () => void;
+  untitled?: boolean;
 };
 
-export function InlineBlock({ label, onActivate }: InlineBlockProps) {
+export function InlineBlock({ label, onActivate, untitled }: InlineBlockProps) {
   return (
-    <AriaButton className="pu-erh-inline-block" onPress={onActivate} type="button">
+    <AriaButton
+      className="pu-erh-inline-block"
+      onPress={onActivate}
+      type="button"
+      data-untitled={untitled || undefined}
+    >
       {label}
     </AriaButton>
   );
@@ -234,6 +240,7 @@ export function FormatToolbar({ active, onToggle, isDisabled }: FormatToolbarPro
           isDisabled={isDisabled}
           aria-pressed={active[format] ?? false}
           aria-label={format}
+          data-format={format}
           onPress={() => onToggle(format)}
         >
           {label}

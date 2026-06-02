@@ -19,8 +19,9 @@ export type InlineView = (props: InlineViewProps) => ReactElement;
 // placeholder — no invented descriptive copy.
 export function DefaultInlineView({ block, onActivate }: InlineViewProps) {
   const title = block.properties.title;
-  const label = typeof title === "string" ? title : block.id;
-  return <InlineBlock label={label} onActivate={onActivate} />;
+  const untitled = typeof title !== "string" || title.length === 0;
+  const label = untitled ? block.id : String(title);
+  return <InlineBlock label={label} onActivate={onActivate} untitled={untitled} />;
 }
 
 // Registry of inline renderers keyed by `display`. Only the default ships.

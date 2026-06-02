@@ -1,66 +1,103 @@
+/* Pu-erh Design System — foundation tokens
+   Near-black/white monochrome, single muted umber accent, editorial type.
+   Fonts: Manrope (display), IBM Plex Sans (body), IBM Plex Mono (technical).
+   All three families cover Cyrillic + Latin. */
+
 :root {
-  /* ── Spacing (4px base grid) ──────────────────────────────── */
-  --space-1:  4px;
-  --space-2:  8px;
-  --space-3:  12px;
-  --space-4:  16px;
-  --space-6:  24px;
-  --space-8:  32px;
-  --space-10: 40px;
-  --space-12: 48px;
-  --space-16: 64px;
+  /* ── Type families ───────────────────────────────────────── */
+  --font-display: 'Manrope', 'Helvetica Neue', Arial, sans-serif;
+  --font-sans:    'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono:    'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-  /* ── Border radii ─────────────────────────────────────────── */
-  --radius-sm:   4px;
-  --radius-md:   8px;
-  --radius-lg:   12px;
-  --radius-full: 9999px;
+  /* ── Type scale ──────────────────────────────────────────── */
+  --text-2xs:  0.6875rem;  /* 11px — eyebrow / mono labels */
+  --text-xs:   0.75rem;    /* 12px — mono metadata */
+  --text-sm:   0.8125rem;  /* 13px — secondary UI / untitled block */
+  --text-base: 1rem;       /* 16px — body prose */
+  --text-md:   1.125rem;   /* 18px — lead paragraph */
+  --text-lg:   1.4375rem;  /* 23px — inline block title */
+  --text-xl:   1.9375rem;  /* 31px — h3 */
+  --text-2xl:  2.625rem;   /* 42px — document heading */
 
-  /* ── Font stacks (3 semantic roles) ──────────────────────── */
-  --font-display: "Geist", "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-sans:    ui-sans-serif, system-ui, sans-serif;
-  --font-mono:    "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
-
-  /* ── Font sizes ───────────────────────────────────────────── */
-  --text-xs:   11px;
-  --text-sm:   13px;
-  --text-base: 15px;
-  --text-lg:   17px;
-  --text-xl:   20px;
-  --text-2xl:  26px;
-
-  /* ── Font weights ─────────────────────────────────────────── */
+  /* ── Weights ─────────────────────────────────────────────── */
   --weight-normal:   400;
   --weight-medium:   500;
   --weight-semibold: 600;
+  --weight-bold:     700;
+  --weight-black:    800;
 
-  /* ── Line heights ─────────────────────────────────────────── */
-  --leading-tight: 1.25;
-  --leading-base:  1.55;
-  --leading-loose: 1.8;
+  /* ── Line heights ────────────────────────────────────────── */
+  --leading-tight: 1.15;
+  --leading-snug:  1.25;
+  --leading-base:  1.5;
+  --leading-loose: 1.7;
 
-  /* ── Neutral palette (warm stone) ────────────────────────── */
-  --color-neutral-0:   #ffffff;
-  --color-neutral-50:  #fafaf9;
-  --color-neutral-100: #f5f4f0;
-  --color-neutral-200: #e8e5e0;
-  --color-neutral-300: #d4cfc8;
-  --color-neutral-400: #b5ada3;
-  --color-neutral-500: #8f877b;
-  --color-neutral-600: #6b6259;
-  --color-neutral-700: #4e463e;
-  --color-neutral-800: #332c26;
-  --color-neutral-900: #1a1512;
+  /* ── Spacing (4px base) ──────────────────────────────────── */
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-5:   20px;
+  --space-6:   24px;
+  --space-8:   32px;
+  --space-10:  40px;
+  --space-12:  48px;
+  --space-16:  64px;
+  --space-24:  96px;
 
-  /* ── Primary accent (earthy amber) ───────────────────────── */
-  --color-primary-400: #c2885a;
-  --color-primary-500: #a8693d;
-  --color-primary-600: #8c5230;
+  /* ── Border radii (minimal, near-square) ─────────────────── */
+  --radius-xs:   2px;
+  --radius-sm:   4px;
+  --radius-md:   7px;
+  --radius-lg:   12px;
+  --radius-full: 9999px;
 
-  /* ── Semantic aliases ─────────────────────────────────────── */
-  --color-bg:         var(--color-neutral-0);
-  --color-surface:    var(--color-neutral-50);
-  --color-border:     var(--color-neutral-200);
-  --color-text:       var(--color-neutral-900);
-  --color-text-muted: var(--color-neutral-500);
+  /* ── Near-black & white monochrome ───────────────────────── */
+  --paper-0: #FCFCFB;   /* page background */
+  --paper-1: #F4F4F2;   /* raised surface / panel */
+  --paper-2: #E9E9E6;   /* hover fill */
+  --paper-3: #DCDCD8;   /* pressed / active fill */
+
+  --ink-900: #15150F;   /* primary text, near-black */
+  --ink-800: #232320;
+  --ink-700: #3A3A36;   /* body */
+  --ink-600: #54534E;
+  --ink-500: #76756F;   /* secondary */
+  --ink-400: #9C9B95;   /* muted / placeholder */
+  --ink-300: #BFBEB8;   /* disabled */
+  --ink-200: #DCDBD6;   /* input border */
+
+  /* Single restrained accent — muted pu-erh umber.
+     Used ONLY for: current-selected marker bar, focus ring, active links.
+     Never a surface fill. Selected-row wash is neutral grey (tea-tint). */
+  --tea-600:  #6F3A20;
+  --tea-500:  #8A4D2E;
+  --tea-400:  #A87A5C;
+  --tea-tint: #ECEBE7;  /* selected-row wash — neutral grey, not amber */
+
+  /* ── Semantic aliases ────────────────────────────────────── */
+  --color-bg:           var(--paper-0);
+  --color-surface:      var(--paper-1);
+  --color-surface-sunk: var(--paper-2);
+  --color-border:       var(--ink-200);
+  --color-text:         var(--ink-900);
+  --color-text-muted:   var(--ink-500);
+  --color-text-faint:   var(--ink-300);
+  --color-primary-400:  var(--tea-400);
+  --color-primary-500:  var(--tea-500);
+  --color-primary-600:  var(--tea-600);
+
+  /* ── Elevation — flat by default; soft shadow for floating chrome ── */
+  --shadow-floating:
+    0 1px 2px rgba(23, 21, 15, 0.06),
+    0 8px 28px -8px rgba(23, 21, 15, 0.18);
+  --shadow-menu:
+    0 2px 4px rgba(23, 21, 15, 0.05),
+    0 12px 40px -10px rgba(23, 21, 15, 0.22);
+
+  /* ── Motion — restrained, editorial; no bounce ──────────── */
+  --ease-out:  cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast:  120ms;
+  --dur-base:  200ms;
+  --dur-slow:  360ms;
 }
